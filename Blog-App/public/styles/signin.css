@@ -1,0 +1,52 @@
+/* Container styling */
+.container {
+  max-width: 400px;
+  margin: 80px auto;
+  padding: 40px 30px;
+  background-color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 25px rgba(0, 0, 0, 0.1);
+}
+
+/* Headline */
+.container h2 {
+  text-align: center;
+  margin-bottom: 30px;
+  color: #343a40;
+}
+
+/* Form labels */
+.form-label {
+  font-weight: 500;
+  color: #495057;
+}
+
+/* Inputs */
+.form-control {
+  border-radius: 8px;
+  border: 1px solid #ced4da;
+  padding: 10px;
+  font-size: 16px;
+}
+
+/* Input focus */
+.form-control:focus {
+  border-color: #0d6efd;
+  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+/* Button */
+.btn-primary {
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+/* Responsive tweaks */
+@media (max-width: 576px) {
+  .container {
+    padding: 30px 20px;
+    margin: 60px 20px;
+  }
+}

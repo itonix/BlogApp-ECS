@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>  
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="/css/style.css">
+  <title>Blogs</title>
+
+  <!-- TinyMCE -->
+  
+ <script src="/tinymce/tinymce.min.js"></script>
+<script>
+tinymce.init({
+  selector: '#editor',
+  license_key: 'gpl', 
+  plugins: 'lists link image code',
+  toolbar: 'undo redo | bold italic | alignleft aligncenter alignright | bullist numlist | link image | code',
+  menubar: 'insert view format',
+  height: 500
+});
+</script>
+
+
+</head>
+<body>
+  <%- include("partials/header.ejs") %>
+  
+  <!-- Greeting pinned to top-left -->
+  <h6 style="position: fixed; top: 70px; left: 10px; margin: 0; 
+             z-index: 1000; background-color: white; padding: 5px 10px; 
+             border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+    Welcome, <%= userName %> 👋
+  </h6>
+
+  <div class="container mt-5">
+    <h1>Create a New Blog Post</h1>
+<form id="blogForm" method="POST" action="/create-post" enctype="multipart/form-data">
+  <input type="text" name="title" class="form-control mb-3" placeholder="Enter blog title" required>
+  <input type="text" name="summary" class="form-control mb-3" placeholder="Enter blog summary" required>
+
+  <!-- Cover Image -->
+  <input type="file" name="image" accept="image/*" class="form-control mb-3" required>
+
+  <!-- TinyMCE Editor -->
+  <textarea id="editor" name="content"></textarea>
+
+  <button type="submit" class="btn btn-primary mt-3">Publish</button>
+</form>
+
+
+  <%- include("partials/footer.ejs") %>
+</body>
+</html>

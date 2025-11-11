@@ -1,0 +1,123 @@
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+
+</head>
+
+
+<body>
+<h2>Blog App </h2>
+<img class="profile" src="images/cat.jpeg" alt="cat profile">
+
+  <section>
+    <p>
+      This is a sample blog application that lets users post text and upload images.
+      Images are stored in Amazon S3. It’s not a full app—just a starter you can extend.
+    </p>
+  </section>
+
+  <section>
+    <h2>Features</h2>
+    <ul>
+      <li>Basic routes for posts and image uploads</li>
+      <li>S3 storage for uploaded images</li>
+      <li>Easy to modify and extend</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Tech Stack</h2>
+    <ul>
+      <li><strong>Backend:</strong> Node.js + Express</li>
+      <li><strong>Storage:</strong> Amazon S3 (configurable bucket)</li>
+      <li><strong>Process Manager (optional):</strong> PM2</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Getting Started</h2>
+    <ol>
+      <li>Install dependencies: <code>npm install</code></li>
+      <li>Set your S3 bucket/region in the app (env or config)</li>
+      <li>Run the app: <code>npm start</code></li>
+      <li>Open: <code>http://localhost:3001</code></li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>Ideas to Extend</h2>
+    <ul>
+      <li>User authentication</li>
+      <li>Database for posts (MongoDB, DynamoDB, or RDS)</li>
+      <li>Better UI and image optimization</li>
+      <li>Comments, likes, tags</li>
+    </ul>
+  </section>
+
+</body>
+</html>
+
+
+ -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blog App</title>
+  <link rel="stylesheet" href="/stylesheets/style.css">
+</head>
+<body>
+  <%- include("partials/header.ejs") %>
+
+  <h2>Blog App</h2>
+  <img class="profile" src="/images/cat.jpeg" alt="cat profile">
+
+  <section>
+    <p>
+      This is a sample blog application that lets users post text and upload images.
+      Images are stored in Amazon S3. It’s not a full app—just a starter you can extend.
+    </p>
+  </section>
+
+  <section>
+    <h2>Features</h2>
+    <ul>
+      <li>Just a basic App for my testing </li>
+      <li>Basic routes for posts and image uploads</li>
+      <li>S3 storage for uploaded images</li>
+      <li>You are free to work on it </li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Tech Stack</h2>
+    <ul>
+      <li><strong>Backend:</strong> Node.js + Express</li>
+      <li><strong>Storage:</strong> Amazon S3 (configurable bucket)</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Getting Started</h2>
+    <ol>
+      <li>Install dependencies: <code>npm install</code></li>
+      <li>Set your S3 bucket/region in the app (env or config) and addition IAM roles and User based on you use case</li>
+      <li>Run the app: <code>node index.js or nodemon index.js</code></li>
+      <li>Open: <code>http://localhost:3001</code></li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>Ideas to Extend</h2>
+    <ul>
+      <li>User authentication - for one user given tony@gmail.com  and sample pass 1234 </li>
+      <li>Database for posts (MongoDB, DynamoDB, or RDS)</li>
+      <li>Better UI and image optimization</li>
+      <li>Comments, likes, tags</li>
+    </ul>
+  </section>
+
+  <%- include("partials/footer.ejs") %>
+</body>
+</html>

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">  
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Bootstrap CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.1/dist/css/bootstrap.min.css">
+  <!-- Font Awesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.10.2/css/all.css">
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="../styles/read-blogs.css">
+
+  <title>Read Blogs</title>
+</head>
+<body>
+<%- include("partials/header.ejs") %>
+
+<main class="container my-5">
+
+  <h2>Read Blogs</h2>
+
+  <div class="row">
+    <% posts.forEach(post => { %>
+      <div class="col-md-6 mb-4">
+        <div class="card">
+          <img src="<%= post.image_url %>" class="card-img-top" alt="<%= post.title %>">
+          <div class="card-body">
+            <h5 class="card-title"><%= post.title %></h5>
+            <p class="card-text"><%- post.summary %></p> <!-- Render TinyMCE HTML safely -->
+            <p class="text-muted"><em>Writer: <%= post.author %></em></p>
+            <a href="/blog/<%= post.id %>" class="btn btn-primary">Read More</a>
+          </div>
+        </div>
+      </div>
+    <% }) %>
+  </div>
+
+  <!-- Pagination -->
+  <div class="d-flex justify-content-between mt-3">
+    <% if(page > 1) { %>
+      <a href="/read-blogs?page=<%= page-1 %>" class="btn btn-secondary">
+        <i class="fas fa-chevron-left"></i> Previous
+      </a>
+    <% } else { %>
+      <div></div>
+    <% } %>
+
+    <% if(page < totalPages) { %>
+      <a href="/read-blogs?page=<%= page+1 %>" class="btn btn-secondary">
+        Next <i class="fas fa-chevron-right"></i>
+      </a>
+    <% } %>
+  </div>
+
+</main>
+
+<%- include("partials/footer.ejs") %>
+
+<!-- Optional Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.1/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

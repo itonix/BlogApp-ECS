@@ -1,0 +1,27 @@
+<%- include("partials/header.ejs") %>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Contact Me</title>
+ <link rel="stylesheet" href="/styles/contact.css" />
+</head>
+<body>
+
+  <div class="container">
+    <h2>Contact Me</h2>
+    <form>
+      <input name="name" type="text" class="feedback-input" placeholder="Your Name" required />
+      <input name="email" type="email" class="feedback-input" placeholder="Your Email" required />
+      <textarea name="message" class="feedback-input" placeholder="Your Message" required></textarea>
+      <button type="submit">Send Message</button>
+    </form>
+  </div>
+
+</body>
+</html>
+<%- include("partials/footer.ejs") %>
+
+
+ 
