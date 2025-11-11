@@ -20,6 +20,7 @@ variable "region" {
 variable "mykeyname" {
   description = "The name of the key pair"
   type        = string
+  default     = "london"
 
 
 }
