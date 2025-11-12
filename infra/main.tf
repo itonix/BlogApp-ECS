@@ -957,7 +957,7 @@ variable "cloudflare_zone_id" {
 module "cloudflare" {
   source             = "./modules/cloudflare"
   alb_dns_name       = aws_lb.frontend_lb.dns_name
-  cloudflare_zone_id = var.cloudflare_zone_id
+  cloudflare_zone_id = var.cloudflare_zone_id   #in tf cloud as env variable TF_VAR_cloudflare_zone_id
 }
 
 
