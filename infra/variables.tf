@@ -59,3 +59,10 @@ variable "ses_identities" {
     "arn:aws:ses:eu-west-2:895581202168:identity/tonyshery@gmail.com"
   ]
 }
+
+variable "myrepo" {
+  description = "ECR public repository name"
+  type        = string
+  default     = "itonix/blog_app"
+  
+}

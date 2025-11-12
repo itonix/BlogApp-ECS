@@ -11,7 +11,8 @@ resource "aws_iam_role" "blogapp_role" {
         Effect = "Allow",
         Action = "sts:AssumeRole",
         Principal = {
-          Service = "ec2.amazonaws.com"
+          Service = ["ecs-tasks.amazonaws.com",
+         "ec2.amazonaws.com"] 
         }
       }
     ]

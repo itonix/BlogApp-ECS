@@ -30,6 +30,7 @@ resource "aws_vpc" "blog_vpc" {
   cidr_block           = "10.0.0.0/16"
   region               = data.aws_region.current.id
   enable_dns_hostnames = "true"
+  enable_dns_support   = "true"
 
   tags = {
     Name = "blog_vpc"
@@ -372,6 +373,7 @@ resource "aws_launch_template" "ecslaunch_template" {
 
   user_data = base64encode(<<-EOF
                 #!/bin/bash
+                echo ECS_ENABLE_AWSLOGS_EXECUTIONROLE_OVERRIDE=true >> /etc/ecs/ecs.config
                 echo ECS_CLUSTER=${var.ecs_cluster_name} >> /etc/ecs/ecs.config
                 EOF
   )
@@ -458,7 +460,7 @@ resource "aws_ecs_capacity_provider" "ecs_capacity_provider" {
       status                    = "ENABLED"
       target_capacity           = 75
       minimum_scaling_step_size = 1
-      maximum_scaling_step_size = 1000
+      maximum_scaling_step_size = 10
     }
   }
 
@@ -467,8 +469,80 @@ resource "aws_ecs_capacity_provider" "ecs_capacity_provider" {
   }
 }
 
-############# task definition and service will be created in ecs module#######################
 
+##### pull public container from ECR repository######
+
+
+
+data "aws_ecr_public_repository" "blog_app_repo" {
+  repository_name = var.myrepo
+}
+
+output "imagee" {
+  value = "${data.aws_ecr_public_repository.blog_app_repo.repository_uri}:latest"
+}
+
+resource "aws_ecs_task_definition" "service" {
+  family                   = "service"
+  requires_compatibilities = ["EC2"]
+  network_mode             = "bridge"
+  task_role_arn              = module.iam.blogapp_role_arn
+  execution_role_arn         = module.iam.blogapp_role_arn
+  cpu                        = "256"  
+  memory                     = "512"
+  container_definitions = jsonencode([
+    {
+      name      = "blog_app_container"
+      image     = "${data.aws_ecr_public_repository.blog_app_repo.repository_uri}:latest"
+      cpu       = 256
+      memory    = 512
+      essential = true
+      portMappings = [
+        {
+          containerPort = 3001
+          hostPort      = 80
+        }
+      ]
+      secrets = [
+        {
+          name      = "DB_USER"
+          valueFrom = "/blog-app/DB_USER"
+        },
+        {
+          name      = "DB_PASS"
+          valueFrom = "/blog-app/DB_PASS"
+        },
+        {
+          name      = "DB_HOST"
+          valueFrom = "/blog-app/DB_HOST"
+        },
+        {
+          name      = "S3_BUCKET_NAME"
+          valueFrom = "/blog-app/S3_BUCKET_NAME"
+        },{
+          name     = "DB_NAME"
+          valueFrom = "/blog-app/DB_NAME"
+        },
+        {
+          name     = "AWS_REGION"
+          valueFrom = "/blog-app/AWS_REGION"
+        },
+        {
+          name     = "DB_PORT"
+          valueFrom = "/blog-app/DB_PORT"
+        },
+        {
+          name = "S3_BUCKET_NAME_TEMPLATE"
+          valueFrom = "/blog-app/S3_BUCKET_NAME_TEMPLATE"
+        },
+        {
+          name = "S3_BUCKET_REGION"
+          valueFrom = "/blog-app/S3_BUCKET_REGION"
+        },
+      ]
+    }
+  ])
+}
 
 
 
@@ -489,19 +563,20 @@ module "ecs_cluster" {
     }
   }
 
-  default_capacity_provider_strategy = {
-    ecs_capacity_provider = {
-      base   = 1
-      weight = 1
-      name   = aws_ecs_capacity_provider.ecs_capacity_provider.name
+  default_capacity_provider_strategy = [
+    {
+      capacity_provider = aws_ecs_capacity_provider.ecs_capacity_provider.name
+      base              = 1
+      weight            = 1
     }
-    tags = {
+  ]
+  tags = {
     Environment = "Development"
     Project     = "EcsEc2"
   }
   }
 
-  }
+  
 ###########################################
 
 
@@ -599,13 +674,14 @@ module "ecs_cluster" {
 
 
 # # #######################ssm parameter store to store DB endpoint##
-# data "aws_ssm_parameter" "db_user" {
-#   name = "/blog-app/DB_USER"
-# }
+data "aws_ssm_parameter" "db_user" {
+  name = "/blog-app/DB_USER"
+}
 
-# data "aws_ssm_parameter" "db_pass" {
-#   name = "/blog-app/DB_PASS"
-# }
+data "aws_ssm_parameter" "db_pass" {
+  name = "/blog-app/DB_PASS"
+}
+
 
 
 
@@ -848,6 +924,9 @@ module "ecs_cluster" {
 # #   alb_dns_name       = aws_lb.frontend_lb.dns_name
 # #   cloudflare_zone_id = var.cloudflare_zone_id
 # # }
+
+
+### role for task execution and task role for ecs service and task definition  
 
 module "iam" {
   source      = "./modules/iam"

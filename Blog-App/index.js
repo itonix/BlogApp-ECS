@@ -16,7 +16,7 @@ import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
 const lambda = new LambdaClient({ region: process.env.AWS_REGION });
 import multer from "multer";
-import crypto from "crypto";
+
 // in app.js or server.js
 
 const app = express();

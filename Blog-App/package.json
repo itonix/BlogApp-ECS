@@ -14,7 +14,6 @@
     "@aws-sdk/client-lambda": "^3.908.0",
     "@aws-sdk/client-s3": "^3.864.0",
     "@aws-sdk/s3-request-presigner": "^3.864.0",
-    "aws-sdk": "^2.1692.0",
     "bcrypt": "^6.0.0",
     "dotenv": "^17.2.1",
     "ejs": "^3.1.9",
@@ -33,3 +32,4 @@
   },
   "homepage": "https://github.com/itonix/App#readme"
 }
+
