@@ -485,14 +485,12 @@ resource "aws_ecs_capacity_provider" "ecs_capacity_provider" {
 
 
 
-data "aws_ecr_public_repository" "blog_app_repo" {
-  provider         = aws.us_east_1
+data "aws_ecr_image" "blog_image" {
   repository_name = var.myrepo
+  image_tag       = "latest"
 }
 
-output "imagee" {
-  value = "${data.aws_ecr_public_repository.blog_app_repo.repository_uri}:latest"
-}
+
 
 resource "aws_ecs_task_definition" "blog_app_task" {
   family                   = "service"
@@ -505,7 +503,7 @@ resource "aws_ecs_task_definition" "blog_app_task" {
   container_definitions = jsonencode([
     {
       name      = "blog_app_container"
-      image     = "${data.aws_ecr_public_repository.blog_app_repo.repository_uri}:latest"
+      image     = var.blog_image
       cpu       = 256
       memory    = 512
       essential = true

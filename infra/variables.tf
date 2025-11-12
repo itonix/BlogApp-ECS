@@ -66,3 +66,10 @@ variable "myrepo" {
   default     = "itonix/blog_app"
 
 }
+
+variable "blog_image" {
+  description = "public image"
+  type        = string
+  default     = "blog_app:latest"
+  
+}
