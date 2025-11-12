@@ -46,11 +46,11 @@ variable "principle_arn" {
   default     = "arn:aws:iam::895581202168:user/Appuser"
 }
 
-# variable "custom_role" {
-#   description = "The name of the custom IAM role"
-#   type        = string
-#   default = ""
-# }
+variable "custom_role" {
+  description = "The name of the custom IAM role"
+  type        = string
+  default     = ""
+}
 
 variable "ses_identities" {
   default = [
@@ -64,5 +64,5 @@ variable "myrepo" {
   description = "ECR public repository name"
   type        = string
   default     = "itonix/blog_app"
-  
+
 }
