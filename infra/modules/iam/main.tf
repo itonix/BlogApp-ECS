@@ -117,7 +117,11 @@ resource "aws_iam_role_policy" "blogapp_policy3" {
 
 
 
-
+#policy 4: ecs taskTaskExecutionRolePolicy
+resource "aws_iam_role_policy_attachment" "blogapp_policy4" {
+  role       = aws_iam_role.blogapp_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+}
 
 
 # Create instance profile
