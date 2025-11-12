@@ -11,6 +11,17 @@ provider "aws" {
   }
 }
 
+
+
+# Additional provider for ECR Public (in us-east-1)
+provider "aws" {
+  alias  = "us_east_1"
+  region = "us-east-1"
+}
+
+
+
+
 data "aws_region" "current" {}
 
 data "aws_caller_identity" "current" {}
@@ -475,6 +486,7 @@ resource "aws_ecs_capacity_provider" "ecs_capacity_provider" {
 
 
 data "aws_ecr_public_repository" "blog_app_repo" {
+  provider         = aws.us_east_1
   repository_name = var.myrepo
 }
 
