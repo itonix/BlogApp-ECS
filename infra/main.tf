@@ -484,12 +484,14 @@ resource "aws_ecs_capacity_provider" "ecs_capacity_provider" {
 ##### pull public container from ECR repository######
 
 
-
-data "aws_ecr_image" "blog_image" {
+data "aws_ecr_public_repository" "blog_app_repo" {
+  provider        = aws.us_east_1
   repository_name = var.myrepo
-  image_tag       = "latest"
 }
 
+locals {
+  blog_image_uri = "${data.aws_ecr_public_repository.blog_app_repo.repository_uri}:latest"
+}
 
 
 resource "aws_ecs_task_definition" "blog_app_task" {
@@ -503,7 +505,7 @@ resource "aws_ecs_task_definition" "blog_app_task" {
   container_definitions = jsonencode([
     {
       name      = "blog_app_container"
-      image     = var.blog_image
+      image     = local.blog_image_uri #using public repo
       cpu       = 256
       memory    = 512
       essential = true
