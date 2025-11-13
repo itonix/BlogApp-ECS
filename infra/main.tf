@@ -473,7 +473,7 @@ resource "aws_ecs_capacity_provider" "ecs_capacity_provider" {
 
 ###################aws_ecs_cluster_capacity_providers###
 resource "aws_ecs_cluster_capacity_providers" "blog_ecs_cluster_capacity" {
-  cluster_name = module.ecs_cluster.cluster_name
+  cluster_name = local.ecs_cluster_name
 
   capacity_providers = [
     aws_ecs_capacity_provider.ecs_capacity_provider.name,
@@ -574,7 +574,7 @@ locals {
 
 resource "aws_ecs_service" "blog_app_service" {
   name                = "app-service"
-  cluster             = module.ecs_cluster.id
+  cluster             = local.cluster_id
   task_definition     = aws_ecs_task_definition.blog_app_task.arn
   desired_count       = 2
   scheduling_strategy = "REPLICA"
@@ -624,15 +624,13 @@ module "ecs_cluster" {
 
 
 ###########################################
-
-output "cluster_name" {
-
-  value = module.ecs_cluster.name
+locals {
+  ecs_cluster_name = module.ecs_cluster.name
 }
 
-output "cluster_id" {
+locals  {
 
-  value = module.ecs_cluster.id
+  cluster_id = module.ecs_cluster.id
 }
 
 
