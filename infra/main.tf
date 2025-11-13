@@ -452,7 +452,7 @@ output "autoscaling_group_name" {
 
 ////ecs capacity provider///
 resource "aws_ecs_capacity_provider" "ecs_capacity_provider" {
-  name = "ecs-capacity-provider"
+  name = "my_capacity_provider"
 
   auto_scaling_group_provider {
     auto_scaling_group_arn         = module.autoscaling.autoscaling_group_arn
