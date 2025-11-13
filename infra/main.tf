@@ -576,7 +576,7 @@ resource "aws_ecs_service" "blog_app_service" {
   name                = "app-service"
   cluster             = local.cluster_id
   task_definition     = aws_ecs_task_definition.blog_app_task.arn
-  desired_count       = 2
+  desired_count       = 1
   scheduling_strategy = "REPLICA"
   iam_role            = local.ecs_service_role_arn
 
