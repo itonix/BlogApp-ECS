@@ -413,7 +413,8 @@ module "autoscaling" {
   # insert the 1 required variable here
   name            = "ecs-autoscaling-group"
   use_name_prefix = true
-  # and any of the optional variables you want here   
+  # and any of the optional variables you want here 
+  protect_from_scale_in = true  
   min_size                  = 1
   max_size                  = 2
   desired_capacity          = 1
