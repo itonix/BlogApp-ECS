@@ -378,13 +378,10 @@ resource "aws_launch_template" "ecslaunch_template" {
 
   user_data = base64encode(<<-EOF
                 #!/bin/bash
-                yum install -y ecs-init
                 systemctl enable docker
                 systemctl start docker
                 echo ECS_CLUSTER=${module.ecs_cluster.name} > /etc/ecs/ecs.config
                 echo ECS_ENABLE_AWSLOGS_EXECUTIONROLE_OVERRIDE=true >> /etc/ecs/ecs.config
-                systemctl enable ecs
-                systemctl start ecs
                 EOF
   )
   depends_on = [module.ecs_cluster]  # <<< ensures cluster exists first
@@ -414,7 +411,7 @@ module "autoscaling" {
   name            = "ecs-autoscaling-group"
   use_name_prefix = true
   # and any of the optional variables you want here 
-  protect_from_scale_in     = true
+  protect_from_scale_in     = false
   min_size                  = 1
   max_size                  = 2
   desired_capacity          = 1
@@ -458,7 +455,7 @@ resource "aws_ecs_capacity_provider" "my_capacity_provider" {
 
   auto_scaling_group_provider {
     auto_scaling_group_arn         = module.autoscaling.autoscaling_group_arn
-    managed_termination_protection = "ENABLED"
+    managed_termination_protection = "DISABLED"
     managed_scaling {
       status                    = "ENABLED"
       target_capacity           = 75
