@@ -566,10 +566,7 @@ locals {
 }
 
 
-resource "aws_iam_role_policy_attachment" "ecs_service_role_attach" {
-  role       = "aws-service-role/ecs.amazonaws.com/AWSServiceRoleForECS"
-  policy_arn = "arn:aws:iam::aws:policy/aws-service-role/AmazonECSServiceRolePolicy"
-}
+
 
 
 ############################ ecs service creation ##########################
@@ -598,7 +595,6 @@ resource "aws_ecs_service" "blog_app_service" {
   }
   depends_on = [aws_lb_target_group.blogapp_tg,
     aws_ecs_cluster_capacity_providers.blog_ecs_cluster_capacity,
-    aws_iam_role_policy_attachment.ecs_service_role_attach
   ]
 
 
