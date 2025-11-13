@@ -474,14 +474,8 @@ resource "aws_ecs_capacity_provider" "ecs_capacity_provider" {
 
 ##### pull public container from ECR repository######
 
-
-data "aws_ecr_public_repository" "blog_app_repo" {
-  provider        = aws.us_east_1
-  repository_name = var.myrepo
-}
-
 locals {
-  blog_image_uri = "${data.aws_ecr_public_repository.blog_app_repo.repository_uri}:latest"
+  blog_image_uri = "public.ecr.aws/w7l2n4u3/itonix/blog_app:latest"
 }
 
 
