@@ -579,7 +579,7 @@ resource "aws_ecs_service" "blog_app_service" {
   cluster             = var.myecs_clustername
   force_new_deployment = true
   task_definition     = aws_ecs_task_definition.blog_app_task.arn
-  desired_count       = 1
+  desired_count       = 2
   scheduling_strategy = "REPLICA"
   iam_role            = local.ecs_service_role_arn
 
