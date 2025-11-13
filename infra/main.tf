@@ -457,7 +457,6 @@ resource "aws_ecs_capacity_provider" "my_capacity_provider" {
   auto_scaling_group_provider {
     auto_scaling_group_arn         = module.autoscaling.autoscaling_group_arn
     managed_termination_protection = "ENABLED"
-
     managed_scaling {
       status                    = "ENABLED"
       target_capacity           = 75
@@ -470,6 +469,7 @@ resource "aws_ecs_capacity_provider" "my_capacity_provider" {
     Project = "ecs-capacity-provider"
   }
 }
+
 
 ###################aws_ecs_cluster_capacity_providers###
 resource "aws_ecs_cluster_capacity_providers" "blog_ecs_cluster_capacity" {
