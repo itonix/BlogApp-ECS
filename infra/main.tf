@@ -432,16 +432,16 @@ module "autoscaling" {
   #   Project             = "megasecret"
   #   propagate_at_launch = true
   # }
-  tags =  {
-      key                 = "AmazonECSManaged"
-      value               = "true"
-      propagate_at_launch = true
-    }
+  tags = {
+    key                 = "AmazonECSManaged"
+    value               = "true"
+    propagate_at_launch = true
+  }
   autoscaling_group_tags = {
-      key                 = "Environment"
-      value               = terraform.workspace
-      propagate_at_launch = true
-    }   
+    key                 = "Environment"
+    value               = terraform.workspace
+    propagate_at_launch = true
+  }
 
 }
 
@@ -483,8 +483,8 @@ resource "aws_ecs_task_definition" "blog_app_task" {
   family                   = "service"
   requires_compatibilities = ["EC2"]
   network_mode             = "bridge"
-  task_role_arn            = module.iam.blogapp_role_arn
-  execution_role_arn       = module.iam.blogapp_role_arn
+  task_role_arn            = module.iam.role_arn
+  execution_role_arn       = module.iam.role_arn
   cpu                      = "256"
   memory                   = "512"
   container_definitions = jsonencode([
@@ -497,7 +497,7 @@ resource "aws_ecs_task_definition" "blog_app_task" {
       portMappings = [
         {
           containerPort = 3001
-          hostPort      = 0           #host port 0 means dynamic port mapping since using bridge mode
+          hostPort      = 0 #host port 0 means dynamic port mapping since using bridge mode
           protocol      = "tcp"
         }
       ]
@@ -595,13 +595,14 @@ module "ecs_cluster" {
     }
   }
 
-  default_capacity_provider_strategy = [
-    {
-      capacity_provider = aws_ecs_capacity_provider.ecs_capacity_provider.name
-      base              = 1
-      weight            = 1
-    }
-  ]
+  default_capacity_provider_strategy = {
+    capacity_provider = aws_ecs_capacity_provider.ecs_capacity_provider.name
+    base              = 1
+    weight            = 1
+
+  }
+
+
   tags = {
     Environment = "Development"
     Project     = "EcsEc2"
@@ -635,7 +636,7 @@ resource "aws_lb" "frontend_lb" {
 # # Create a target group for the load balancer
 resource "aws_lb_target_group" "blogapp_tg" {
   name     = "blogapp-tg"
-  port     = 3001  #container port
+  port     = 3001 #container port
   protocol = "HTTP"
   vpc_id   = aws_vpc.blog_vpc.id
   # stickiness {
@@ -954,7 +955,7 @@ variable "cloudflare_zone_id" {
 module "cloudflare" {
   source             = "./modules/cloudflare"
   alb_dns_name       = aws_lb.frontend_lb.dns_name
-  cloudflare_zone_id = var.cloudflare_zone_id   #in tf cloud as env variable TF_VAR_cloudflare_zone_id
+  cloudflare_zone_id = var.cloudflare_zone_id #in tf cloud as env variable TF_VAR_cloudflare_zone_id
 }
 
 
