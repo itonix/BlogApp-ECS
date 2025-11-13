@@ -643,6 +643,15 @@ locals {
 
 
 
+###############################################################
+resource "aws_security_group_rule" "allow_alb_to_ec2_ephemeral" {
+  type                     = "ingress"
+  from_port                = 32768
+  to_port                  = 61000   # or  prefer
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.ec2_securitygrp.id
+  source_security_group_id = aws_security_group.vpc_securitygrp.id   # ALB SG
+}
 
 
 
@@ -665,6 +674,7 @@ resource "aws_lb_target_group" "blogapp_tg" {
   port     = 3001 #container port
   protocol = "HTTP"
   vpc_id   = aws_vpc.blog_vpc.id
+  target_type = "instance"
   # stickiness {
   #   type            = "lb_cookie"
   #   cookie_duration = 3600 # 1 hour
@@ -725,11 +735,11 @@ resource "aws_lb_listener" "app_listener" {
 
 
 
-# # Attach the Auto Scaling Group to the Target Group
-resource "aws_autoscaling_attachment" "asg_attachment" {
-  autoscaling_group_name = module.autoscaling.autoscaling_group_name
-  lb_target_group_arn    = aws_lb_target_group.blogapp_tg.arn
-}
+# # # Attach the Auto Scaling Group to the Target Group
+# resource "aws_autoscaling_attachment" "asg_attachment" {
+#   autoscaling_group_name = module.autoscaling.autoscaling_group_name
+#   lb_target_group_arn    = aws_lb_target_group.blogapp_tg.arn
+# }
 
 
 # # #######################ssm parameter store to store DB endpoint##
