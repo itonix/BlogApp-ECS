@@ -471,6 +471,21 @@ resource "aws_ecs_capacity_provider" "ecs_capacity_provider" {
   }
 }
 
+###################aws_ecs_cluster_capacity_providers###
+resource "aws_ecs_cluster_capacity_providers" "blog_ecs_cluster_capacity" {
+  cluster_name = module.ecs_cluster.cluster_name
+
+  capacity_providers = [
+    aws_ecs_capacity_provider.ecs_capacity_provider.name,
+  ]
+
+  default_capacity_provider_strategy {
+    base              = 1
+    weight            = 1
+    capacity_provider = aws_ecs_capacity_provider.ecs_capacity_provider.name
+  }
+}
+
 
 ##### pull public container from ECR repository######
 
@@ -559,7 +574,7 @@ locals {
 
 resource "aws_ecs_service" "blog_app_service" {
   name                = "app-service"
-  cluster             = module.ecs_cluster.cluster_id
+  cluster             = module.ecs_cluster.id
   task_definition     = aws_ecs_task_definition.blog_app_task.arn
   desired_count       = 2
   scheduling_strategy = "REPLICA"
@@ -575,6 +590,11 @@ resource "aws_ecs_service" "blog_app_service" {
     container_name   = "blog_app_container"
     container_port   = 3001
   }
+  depends_on = [aws_lb_target_group.blogapp_tg
+    ,
+    aws_ecs_cluster_capacity_providers.blog_ecs_cluster_capacity
+  ]
+
 
 }
 
@@ -595,13 +615,6 @@ module "ecs_cluster" {
     }
   }
 
-  default_capacity_provider_strategy = {
-    capacity_provider = aws_ecs_capacity_provider.ecs_capacity_provider.name
-    base              = 1
-    weight            = 1
-
-  }
-
 
   tags = {
     Environment = "Development"
@@ -612,8 +625,15 @@ module "ecs_cluster" {
 
 ###########################################
 
+output "cluster_name" {
 
+  value = module.ecs_cluster.name
+}
 
+output "cluster_id" {
+
+  value = module.ecs_cluster.id
+}
 
 
 
