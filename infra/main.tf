@@ -432,25 +432,16 @@ module "autoscaling" {
   #   Project             = "megasecret"
   #   propagate_at_launch = true
   # }
-  autoscaling_group_tags = [
-    {
-      key                 = "Environment"
-      value               = terraform.workspace
-      propagate_at_launch = true
-    },
-    {
-      key                 = "Project"
-      value               = "megasecret"
-      propagate_at_launch = true
-    },
-    {
+  tags =  {
       key                 = "AmazonECSManaged"
       value               = "true"
       propagate_at_launch = true
     }
-  ]
-
-
+  autoscaling_group_tags = {
+      key                 = "Environment"
+      value               = terraform.workspace
+      propagate_at_launch = true
+    }   
 
 }
 
