@@ -451,7 +451,7 @@ output "autoscaling_group_name" {
 
 
 ////ecs capacity provider///
-resource "aws_ecs_capacity_provider" "ecs_capacity_provider" {
+resource "aws_ecs_capacity_provider" "my_capacity_provider" {
   name = "my_capacity_provider"
 
   auto_scaling_group_provider {
@@ -476,13 +476,13 @@ resource "aws_ecs_cluster_capacity_providers" "blog_ecs_cluster_capacity" {
   cluster_name = local.ecs_cluster_name
 
   capacity_providers = [
-    aws_ecs_capacity_provider.ecs_capacity_provider.name,
+    aws_ecs_capacity_provider.my_capacity_provider.name,
   ]
 
   default_capacity_provider_strategy {
     base              = 1
     weight            = 1
-    capacity_provider = aws_ecs_capacity_provider.ecs_capacity_provider.name
+    capacity_provider = aws_ecs_capacity_provider.my_capacity_provider.name
   }
 }
 
