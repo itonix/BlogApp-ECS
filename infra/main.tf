@@ -414,7 +414,7 @@ module "autoscaling" {
   name            = "ecs-autoscaling-group"
   use_name_prefix = true
   # and any of the optional variables you want here 
-  protect_from_scale_in = true  
+  protect_from_scale_in     = true
   min_size                  = 1
   max_size                  = 2
   desired_capacity          = 1
@@ -424,10 +424,11 @@ module "autoscaling" {
   # Launch template
   launch_template_id      = aws_launch_template.ecslaunch_template.id
   launch_template_version = "$Latest"
-  instance_type           = "t2.micro"
-  instance_name           = "asg-instances"
-  create_launch_template  = false
-  depends_on              = [aws_launch_template.ecslaunch_template]
+
+  instance_type          = "t2.micro"
+  instance_name          = "asg-instances"
+  create_launch_template = false
+  depends_on             = [aws_launch_template.ecslaunch_template]
   # tags = {
   #   Environment         = terraform.workspace
   #   Project             = "megasecret"
@@ -629,7 +630,7 @@ locals {
   ecs_cluster_name = module.ecs_cluster.name
 }
 
-locals  {
+locals {
 
   cluster_id = module.ecs_cluster.id
 }
