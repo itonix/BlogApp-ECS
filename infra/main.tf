@@ -337,13 +337,7 @@ output "ecs_ami_id" {
   sensitive = true
 }
 
-####
-variable "ecs_cluster_name" {
-  description = "Name of the ECS cluster"
-  type        = string
-  default     = "ECS-Cluster"
 
-}
 
 # # #########################################################launc template for autoscaling group#####
 
@@ -384,8 +378,12 @@ resource "aws_launch_template" "ecslaunch_template" {
 
   user_data = base64encode(<<-EOF
                 #!/bin/bash
+                yum update -y ecs-init
+                systemctl restart docker
+                systemctl restart ecs
                 echo ECS_ENABLE_AWSLOGS_EXECUTIONROLE_OVERRIDE=true >> /etc/ecs/ecs.config
-                echo ECS_CLUSTER=${var.ecs_cluster_name} >> /etc/ecs/ecs.config
+                echo ECS_CLUSTER=${local.ecs_cluster_name} >> /etc/ecs/ecs.config
+                systemctl restart ecs
                 EOF
   )
 }
