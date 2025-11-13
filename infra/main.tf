@@ -378,14 +378,16 @@ resource "aws_launch_template" "ecslaunch_template" {
 
   user_data = base64encode(<<-EOF
                 #!/bin/bash
-                yum update -y ecs-init
-                systemctl restart docker
-                systemctl restart ecs
+                yum install -y ecs-init
+                systemctl enable docker
+                systemctl start docker
+                echo ECS_CLUSTER=${module.ecs_cluster.name} > /etc/ecs/ecs.config
                 echo ECS_ENABLE_AWSLOGS_EXECUTIONROLE_OVERRIDE=true >> /etc/ecs/ecs.config
-                echo ECS_CLUSTER=${local.ecs_cluster_name} >> /etc/ecs/ecs.config
-                systemctl restart ecs
+                systemctl enable ecs
+                systemctl start ecs
                 EOF
   )
+  depends_on = [module.ecs_cluster]  # <<< ensures cluster exists first
 }
 
 
@@ -473,7 +475,7 @@ resource "aws_ecs_capacity_provider" "my_capacity_provider" {
 
 ###################aws_ecs_cluster_capacity_providers###
 resource "aws_ecs_cluster_capacity_providers" "blog_ecs_cluster_capacity" {
-  cluster_name = local.ecs_cluster_name
+  cluster_name = var.myecs_clustername
 
   capacity_providers = [
     aws_ecs_capacity_provider.my_capacity_provider.name,
@@ -574,7 +576,7 @@ locals {
 
 resource "aws_ecs_service" "blog_app_service" {
   name                = "app-service"
-  cluster             = local.cluster_id
+  cluster             = var.myecs_clustername
   force_new_deployment = true
   task_definition     = aws_ecs_task_definition.blog_app_task.arn
   desired_count       = 1
@@ -601,11 +603,19 @@ resource "aws_ecs_service" "blog_app_service" {
 
 /////////////////////////////////ECS-cluster creation##########################
 
+variable "myecs_clustername" {
+  description = "Name of the ECS cluster"
+  type        = string
+  default     = "my-ecs-cluster"
+  
+}
+///////
+
 
 module "ecs_cluster" {
   source = "terraform-aws-modules/ecs/aws//modules/cluster"
 
-  name                    = "ecs-ec2"
+  name                    = var.myecs_clustername
   create_task_exec_policy = false
   configuration = {
     execute_command_configuration = {
