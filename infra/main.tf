@@ -409,7 +409,7 @@ module "autoscaling" {
   use_name_prefix = true
   # and any of the optional variables you want here 
   protect_from_scale_in     = false
-  min_size                  = 0
+  min_size                  = 1
   max_size                  = 2
   desired_capacity          = 0
   health_check_type         = "EC2"
