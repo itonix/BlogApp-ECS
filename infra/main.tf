@@ -477,7 +477,7 @@ resource "aws_ecs_cluster_capacity_providers" "blog_ecs_cluster_capacity" {
 
   default_capacity_provider_strategy {
     base              = 0
-    weight            = 0
+    weight            = 1
     capacity_provider = aws_ecs_capacity_provider.my_capacity_provider.name
   }
 }
