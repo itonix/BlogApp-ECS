@@ -1,7 +1,7 @@
 
 
-# Create IAM Role for EC2 instances
-resource "aws_iam_role" "blogapp_role" {
+# Create for task role 
+resource "aws_iam_role" "blogapp_task_role" {
   name = var.custom_role
 
   assume_role_policy = jsonencode({
@@ -12,7 +12,7 @@ resource "aws_iam_role" "blogapp_role" {
         Action = "sts:AssumeRole",
         Principal = {
           Service = ["ecs-tasks.amazonaws.com",
-         "ec2.amazonaws.com"] 
+          ]
         }
       }
     ]
@@ -23,33 +23,12 @@ resource "aws_iam_role" "blogapp_role" {
   }
 }
 
-# Policy 1: EC2 + Infra permissions
-resource "aws_iam_role_policy" "blogapp_policy1" {
-  name = "blogapp_policy1"
-  role = aws_iam_role.blogapp_role.name
 
-  policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [
-      {
-        Effect = "Allow",
-        Action = [
-          "ec2:*",
-          "elasticloadbalancing:*",
-          "cloudwatch:*",
-          "autoscaling:*",
-          "iam:CreateServiceLinkedRole"
-        ],
-        Resource = "*"
-      }
-    ]
-  })
-}
 
 # Policy 2: Lambda + S3 access
 resource "aws_iam_role_policy" "blogapp_policy2" {
   name = "blogapp_policy2"
-  role = aws_iam_role.blogapp_role.name
+  role = aws_iam_role.blogapp_task_role.id
 
   policy = jsonencode({
     Version = "2012-10-17",
@@ -88,7 +67,7 @@ resource "aws_iam_role_policy" "blogapp_policy2" {
 # Policy 3: SSM Parameter Store
 resource "aws_iam_role_policy" "blogapp_policy3" {
   name = "blogapp_policy3"
-  role = aws_iam_role.blogapp_role.name
+  role = aws_iam_role.blogapp_task_role.id
 
   policy = jsonencode({
     Version = "2012-10-17",
@@ -117,15 +96,3 @@ resource "aws_iam_role_policy" "blogapp_policy3" {
 
 
 
-#policy 4: ecs taskTaskExecutionRolePolicy
-resource "aws_iam_role_policy_attachment" "blogapp_policy4" {
-  role       = aws_iam_role.blogapp_role.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
-}
-
-
-# Create instance profile
-resource "aws_iam_instance_profile" "blogapp_instance_profile" {
-  name = "blogapp_instance_profile"
-  role = aws_iam_role.blogapp_role.name
-}

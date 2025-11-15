@@ -69,7 +69,7 @@ output "Az" {
 resource "aws_subnet" "publicsubnets" {
 
   vpc_id                  = aws_vpc.blog_vpc.id
-  count                   = length(local.azs) - 1
+  count                   = length(local.azs) 
   cidr_block              = cidrsubnet(aws_vpc.blog_vpc.cidr_block, 7, count.index)
   map_public_ip_on_launch = "true"
   availability_zone       = local.azs[count.index]
@@ -341,10 +341,7 @@ output "ecs_ami_id" {
 
 # # #########################################################launc template for autoscaling group#####
 
-#import existing iam instance profile
-data "aws_iam_instance_profile" "ecs_instance_profile" {
-  name = "ecsInstanceRole"
-}
+
 
 
 
@@ -355,7 +352,7 @@ resource "aws_launch_template" "ecslaunch_template" {
   image_id = data.aws_ssm_parameter.ecs_ami_id.value
   iam_instance_profile {
     //name = "EC2App-test"
-    name = data.aws_iam_instance_profile.ecs_instance_profile.name
+    name = module.iam_instance_profile.instanceprofile_name
   }
   instance_initiated_shutdown_behavior = "terminate"
   vpc_security_group_ids               = [aws_security_group.ec2_securitygrp.id] # <- use this
@@ -384,7 +381,7 @@ resource "aws_launch_template" "ecslaunch_template" {
                 echo ECS_ENABLE_AWSLOGS_EXECUTIONROLE_OVERRIDE=true >> /etc/ecs/ecs.config
                 EOF
   )
-  depends_on = [module.ecs_cluster]  # <<< ensures cluster exists first
+  depends_on = [module.ecs_cluster] # <<< ensures cluster exists first
 }
 
 
@@ -412,9 +409,9 @@ module "autoscaling" {
   use_name_prefix = true
   # and any of the optional variables you want here 
   protect_from_scale_in     = false
-  min_size                  = 1
+  min_size                  = 0
   max_size                  = 2
-  desired_capacity          = 1
+  desired_capacity          = 0
   health_check_type         = "EC2"
   health_check_grace_period = 300 #seconds
   vpc_zone_identifier       = aws_subnet.privatesubnets[*].id
@@ -497,8 +494,8 @@ resource "aws_ecs_task_definition" "blog_app_task" {
   family                   = "service"
   requires_compatibilities = ["EC2"]
   network_mode             = "bridge"
-  task_role_arn            = module.iam.role_arn
-  execution_role_arn       = module.iam.role_arn
+  task_role_arn            = module.iam_task_role.taskrole_arn
+  execution_role_arn       = module.iam_ecstaskexectionrole.ecstaskexecution_role_arn
   cpu                      = "256"
   memory                   = "512"
   container_definitions = jsonencode([
@@ -561,12 +558,6 @@ resource "aws_ecs_task_definition" "blog_app_task" {
 
 ############################ecs service role for alb##########################
 
-locals {
-  ecs_service_role_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/aws-service-role/ecs.amazonaws.com/AWSServiceRoleForECS"
-}
-
-
-
 
 
 ############################ ecs service creation ##########################
@@ -575,17 +566,17 @@ locals {
 
 
 resource "aws_ecs_service" "blog_app_service" {
-  name                = "app-service"
-  cluster             = var.myecs_clustername
+  name                 = "app-service"
+  cluster              = var.myecs_clustername
   force_new_deployment = true
-  task_definition     = aws_ecs_task_definition.blog_app_task.arn
-  desired_count       = 2
-  scheduling_strategy = "REPLICA"
-  iam_role            = local.ecs_service_role_arn
-
+  task_definition      = aws_ecs_task_definition.blog_app_task.arn
+  desired_count        = 4
+  scheduling_strategy  = "REPLICA"
   ordered_placement_strategy {
-    type  = "binpack"
-    field = "cpu"
+    type  = "random"
+    //field = "cpu"
+
+
   }
 
   load_balancer {
@@ -595,6 +586,7 @@ resource "aws_ecs_service" "blog_app_service" {
   }
   depends_on = [aws_lb_target_group.blogapp_tg,
     aws_ecs_cluster_capacity_providers.blog_ecs_cluster_capacity,
+   
   ]
 
 
@@ -606,7 +598,7 @@ variable "myecs_clustername" {
   description = "Name of the ECS cluster"
   type        = string
   default     = "my-ecs-cluster"
-  
+
 }
 ///////
 
@@ -649,10 +641,10 @@ locals {
 resource "aws_security_group_rule" "allow_alb_to_ec2_ephemeral" {
   type                     = "ingress"
   from_port                = 32768
-  to_port                  = 61000   # or  prefer
+  to_port                  = 61000 # or  prefer
   protocol                 = "tcp"
   security_group_id        = aws_security_group.ec2_securitygrp.id
-  source_security_group_id = aws_security_group.vpc_securitygrp.id   # ALB SG
+  source_security_group_id = aws_security_group.vpc_securitygrp.id # ALB SG
 }
 
 
@@ -672,10 +664,10 @@ resource "aws_lb" "frontend_lb" {
 }
 # # Create a target group for the load balancer
 resource "aws_lb_target_group" "blogapp_tg" {
-  name     = "blogapp-tg"
-  port     = 3001 #container port
-  protocol = "HTTP"
-  vpc_id   = aws_vpc.blog_vpc.id
+  name        = "blogapp-tg"
+  port        = 3001 #container port
+  protocol    = "HTTP"
+  vpc_id      = aws_vpc.blog_vpc.id
   target_type = "instance"
   # stickiness {
   #   type            = "lb_cookie"
@@ -999,9 +991,19 @@ module "cloudflare" {
 
 ### role for task execution and task role for ecs service and task definition  
 
-module "iam" {
-  source      = "./modules/iam"
+module "iam_task_role" {
+  source      = "./modules/iam_task_role"
   custom_role = "blogapp_role"
+}
+
+module "iam_ecstaskexectionrole" {
+  source = "./modules/iam_ecstaskexectionrole"
+
+}
+
+module "iam_instance_profile" {
+  source = "./modules/iam_instance_ecs_profile"
+
 }
 
 
