@@ -428,18 +428,17 @@ module "autoscaling" {
   #   Project             = "megasecret"
   #   propagate_at_launch = true
   # }
+    
+
   tags = {
     key                 = "AmazonECSManaged"
-    value               = "true"
+    value               = true
     propagate_at_launch = true
   }
-  autoscaling_group_tags = {
-    key                 = "Environment"
-    value               = terraform.workspace
-    propagate_at_launch = true
-  }
-
 }
+
+
+
 
 output "autoscaling_group_name" {
   value = module.autoscaling.autoscaling_group_name
@@ -478,6 +477,7 @@ resource "aws_ecs_cluster_capacity_providers" "blog_ecs_cluster_capacity" {
   default_capacity_provider_strategy {
     base              = 0
     weight            = 1
+
     capacity_provider = aws_ecs_capacity_provider.my_capacity_provider.name
   }
 }
