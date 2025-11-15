@@ -377,11 +377,11 @@ resource "aws_launch_template" "ecslaunch_template" {
                 #!/bin/bash
                 systemctl enable docker
                 systemctl start docker
-                echo ECS_CLUSTER=${module.ecs_cluster.name} > /etc/ecs/ecs.config
+                echo ECS_CLUSTER=${aws_ecs_cluster.my_ecs.name} > /etc/ecs/ecs.config
                 echo ECS_ENABLE_AWSLOGS_EXECUTIONROLE_OVERRIDE=true >> /etc/ecs/ecs.config
                 EOF
   )
-  depends_on = [module.ecs_cluster] # <<< ensures cluster exists first
+  depends_on = [aws_ecs_cluster.my_ecs] # <<< ensures cluster exists first
 }
 
 
@@ -413,7 +413,7 @@ module "autoscaling" {
   max_size                  = 2
   desired_capacity          = 0
   health_check_type         = "EC2"
-  health_check_grace_period = 300 #seconds
+  health_check_grace_period = 30 #seconds
   vpc_zone_identifier       = aws_subnet.privatesubnets[*].id
   # Launch template
   launch_template_id      = aws_launch_template.ecslaunch_template.id
@@ -476,8 +476,8 @@ resource "aws_ecs_cluster_capacity_providers" "blog_ecs_cluster_capacity" {
   ]
 
   default_capacity_provider_strategy {
-    base              = 1
-    weight            = 1
+    base              = 0
+    weight            = 0
     capacity_provider = aws_ecs_capacity_provider.my_capacity_provider.name
   }
 }
@@ -572,6 +572,11 @@ resource "aws_ecs_service" "blog_app_service" {
   task_definition      = aws_ecs_task_definition.blog_app_task.arn
   desired_count        = 4
   scheduling_strategy  = "REPLICA"
+  deployment_minimum_healthy_percent = 0
+  health_check_grace_period_seconds = 60
+  deployment_configuration {
+    bake_time_in_minutes = 1
+  }
   ordered_placement_strategy {
     type  = "random"
     //field = "cpu"
@@ -601,23 +606,23 @@ variable "myecs_clustername" {
 
 }
 ///////
+resource "aws_ecs_cluster" "my_ecs" {
+  name = var.myecs_clustername
 
+  setting {
+    name  = "containerInsights"
+    value = "enabled"
+  }
 
-module "ecs_cluster" {
-  source = "terraform-aws-modules/ecs/aws//modules/cluster"
-
-  name                    = var.myecs_clustername
-  create_task_exec_policy = false
-  configuration = {
-    execute_command_configuration = {
+  configuration {
+    execute_command_configuration {
       logging = "OVERRIDE"
-      log_configuration = {
+
+      log_configuration {
         cloud_watch_log_group_name = "/aws/ecs/aws-ec2"
       }
     }
   }
-
-
   tags = {
     Environment = "Development"
     Project     = "EcsEc2"
@@ -625,14 +630,40 @@ module "ecs_cluster" {
 }
 
 
+
+
+
+///////
+# module "ecs_cluster" {
+#   source = "terraform-aws-modules/ecs/aws//modules/cluster"
+
+#   name                    = var.myecs_clustername
+#   create_task_exec_policy = false
+#   configuration = {
+#     execute_command_configuration = {
+#       logging = "OVERRIDE"
+#       log_configuration = {
+#         cloud_watch_log_group_name = "/aws/ecs/aws-ec2"
+#       }
+#     }
+#   }
+
+
+#   tags = {
+#     Environment = "Development"
+#     Project     = "EcsEc2"
+#   }
+# }
+
+
 ###########################################
 locals {
-  ecs_cluster_name = module.ecs_cluster.name
+  ecs_cluster_name = aws_ecs_cluster.my_ecs.name
 }
 
 locals {
 
-  cluster_id = module.ecs_cluster.id
+  cluster_id = aws_ecs_cluster.my_ecs.id
 }
 
 
@@ -674,6 +705,7 @@ resource "aws_lb_target_group" "blogapp_tg" {
   #   cookie_duration = 3600 # 1 hour
   #   enabled         = true
   # }
+  deregistration_delay = 40 
 
   health_check {
     path                = "/"
