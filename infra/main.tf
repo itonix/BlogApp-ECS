@@ -400,38 +400,33 @@ data "aws_key_pair" "deployer_key" {
 
 
 
-# # ##########################################################Auto scaling group module
+# # ##########################################################Auto scaling group 
 
-module "autoscaling" {
-  source  = "terraform-aws-modules/autoscaling/aws"
-  version = "9.0.1"
-  # insert the 1 required variable here
-  name            = "ecs-autoscaling-group"
-  use_name_prefix = true
-  # and any of the optional variables you want here 
-  protect_from_scale_in     = false
+
+resource "aws_autoscaling_group" "ecs-autoscaling-group" {
+  name                      = "ecs-autoscaling-group"
+  max_size                  = 3
   min_size                  = 1
-  max_size                  = 2
-  desired_capacity          = 0
+  health_check_grace_period = 100
   health_check_type         = "EC2"
-  health_check_grace_period = 30 #seconds
-  vpc_zone_identifier       = aws_subnet.privatesubnets[*].id
-  # Launch template
-  launch_template_id      = aws_launch_template.ecslaunch_template.id
-  launch_template_version = "$Latest"
+  desired_capacity          = 2
+  force_delete              = false
+  launch_template {
+    id      = aws_launch_template.ecslaunch_template.id
+    version = aws_launch_template.ecslaunch_template.latest_version
+  }
+  vpc_zone_identifier = aws_subnet.privatesubnets[*].id
 
-  instance_type          = "t2.micro"
-  instance_name          = "asg-instances"
-  create_launch_template = false
-  depends_on             = [aws_launch_template.ecslaunch_template]
-  # tags = {
-  #   Environment         = terraform.workspace
-  #   Project             = "megasecret"
-  #   propagate_at_launch = true
-  # }
-    
+  instance_maintenance_policy {
+    min_healthy_percentage = 90
+    max_healthy_percentage = 120
+  }
 
-  tags = {
+  timeouts {
+    delete = "3m"
+  }
+
+  tag {
     key                 = "AmazonECSManaged"
     value               = true
     propagate_at_launch = true
@@ -439,10 +434,14 @@ module "autoscaling" {
 }
 
 
+//////////////////////////////////////////
+
+
+
 
 
 output "autoscaling_group_name" {
-  value = module.autoscaling.autoscaling_group_name
+  value = aws_autoscaling_group.ecs-autoscaling-group.name
 }
 
 
@@ -451,11 +450,11 @@ resource "aws_ecs_capacity_provider" "my_capacity_provider" {
   name = "my_capacity_provider"
 
   auto_scaling_group_provider {
-    auto_scaling_group_arn         = module.autoscaling.autoscaling_group_arn
+    auto_scaling_group_arn         = aws_autoscaling_group.ecs-autoscaling-group.arn
     managed_termination_protection = "DISABLED"
     managed_scaling {
       status                    = "ENABLED"
-      target_capacity           = 3
+      target_capacity           = 100
       minimum_scaling_step_size = 1
       maximum_scaling_step_size = 10
     }
@@ -466,22 +465,6 @@ resource "aws_ecs_capacity_provider" "my_capacity_provider" {
   }
 }
 
-
-###################aws_ecs_cluster_capacity_providers###
-resource "aws_ecs_cluster_capacity_providers" "blog_ecs_cluster_capacity" {
-  cluster_name = var.myecs_clustername
-
-  capacity_providers = [
-    aws_ecs_capacity_provider.my_capacity_provider.name,
-  ]
-
-  default_capacity_provider_strategy {
-    base              = 0
-    weight            = 1
-
-    capacity_provider = aws_ecs_capacity_provider.my_capacity_provider.name
-  }
-}
 
 
 ##### pull public container from dockerhub repository######
@@ -497,14 +480,14 @@ resource "aws_ecs_task_definition" "blog_app_task" {
   network_mode             = "bridge"
   task_role_arn            = module.iam_task_role.taskrole_arn
   execution_role_arn       = module.iam_ecstaskexectionrole.ecstaskexecution_role_arn
-  cpu                      = "256"
-  memory                   = "512"
+  cpu                      = "128"
+  memory                   = "128"
   container_definitions = jsonencode([
     {
       name      = "blog_app_container"
       image     = local.blog_image_uri #using public repo
-      cpu       = 256
-      memory    = 512
+      cpu       = 128
+      memory    = 128
       essential = true
       portMappings = [
         {
@@ -574,6 +557,7 @@ resource "aws_ecs_service" "blog_app_service" {
   name                 = "app-service"
   cluster              = var.myecs_clustername
   force_new_deployment = true
+  force_delete                       = true
   task_definition      = aws_ecs_task_definition.blog_app_task.arn
   desired_count        = var.replica_count
   scheduling_strategy  = "REPLICA"
@@ -595,7 +579,13 @@ resource "aws_ecs_service" "blog_app_service" {
     container_name   = "blog_app_container"
     container_port   = 3001
   }
-  depends_on = [module.autoscaling]
+  depends_on = [    aws_lb_listener.app_listener,
+    aws_lb_target_group.blogapp_tg,
+    aws_lb.frontend_lb,
+    aws_ecs_cluster_capacity_providers.blog_ecs_cluster_capacity,
+    aws_autoscaling_group.ecs-autoscaling-group,
+    module.iam_instance_profile.aws_iam_role_policy_attachment,
+    module.iam_ecstaskexectionrole]
    
   
 
@@ -710,13 +700,13 @@ resource "aws_lb_target_group" "blogapp_tg" {
   #   cookie_duration = 3600 # 1 hour
   #   enabled         = true
   # }
-  deregistration_delay = 40 
+  deregistration_delay = 10 
 
   health_check {
     path                = "/"
-    interval            = 30
+    interval            = 10
     timeout             = 5
-    healthy_threshold   = 5
+    healthy_threshold   = 2
     unhealthy_threshold = 2
     matcher             = "200-399"
   }
