@@ -47,6 +47,8 @@ CMD ["node", "index.js"]'''
     sh """
        echo "$PASS" | docker login -u "$USER" --password-stdin
        docker buildx build -t tonygeorgethomas/blog_app:latest --push .
+       docker rmi -f $(docker images -aq)
+
     """
      
 }
