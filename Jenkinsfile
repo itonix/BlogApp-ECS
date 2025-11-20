@@ -44,12 +44,12 @@ CMD ["node", "index.js"]'''
 
                  withCredentials([usernamePassword(credentialsId: '508428c5-61d5-4b34-8601-5f9c11113ce9', passwordVariable: 'PASS', usernameVariable: 'USER')]) {
     // some block
-    sh """
+    sh '''
        echo "$PASS" | docker login -u "$USER" --password-stdin
        docker buildx build -t tonygeorgethomas/blog_app:latest --push .
        docker rmi -f $(docker images -aq)
 
-    """
+    '''
      
 }
                 }
