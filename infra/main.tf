@@ -544,7 +544,24 @@ resource "aws_ecs_task_definition" "blog_app_task" {
 
 
 
-############################ecs service role for alb##########################
+
+
+###################aws_ecs_cluster_capacity_providers###
+resource "aws_ecs_cluster_capacity_providers" "blog_ecs_cluster_capacity" {
+  cluster_name = var.myecs_clustername
+
+  capacity_providers = [
+    aws_ecs_capacity_provider.my_capacity_provider.name,
+  ]
+
+  default_capacity_provider_strategy {
+    base   = 0
+    weight = 1
+
+    capacity_provider = aws_ecs_capacity_provider.my_capacity_provider.name
+  }
+}
+
 
 
 
