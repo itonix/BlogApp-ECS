@@ -97,3 +97,4 @@ TF clould is given a federated role  `Securely access AWS from HCP Terraform usi
 
 <img width="1677" height="363" alt="spreadplacementstrategy" src="https://github.com/user-attachments/assets/dc105484-6261-4820-b09a-7993b90c256a" />
 
+<img width="1331" height="1026" alt="ecs drawio" src="https://github.com/user-attachments/assets/427fe520-26b3-4d8c-b16a-baba0f044ae5" />
