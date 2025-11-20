@@ -42,7 +42,7 @@ CMD ["node", "index.js"]'''
             steps {
                 dir('Blog-App') {
 
-                 withCredentials([usernamePassword(credentialsId: '144bc174-cf73-49bf-9efb-7b0598a9ee0f', passwordVariable: 'PASS', usernameVariable: 'USER')]) {
+                 withCredentials([usernamePassword(credentialsId: '508428c5-61d5-4b34-8601-5f9c11113ce9', passwordVariable: 'PASS', usernameVariable: 'USER')]) {
     // some block
     sh """
        echo "$PASS" | docker login -u "$USER" --password-stdin
