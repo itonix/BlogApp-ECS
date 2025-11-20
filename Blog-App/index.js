@@ -238,7 +238,7 @@ app.post("/register", async (req, res) => {
     //   Payload: Buffer.from(payload),
     // };
     const input = {
-      FunctionName: "arn:aws:lambda:eu-west-2:895581202168:function:welcomefunction", // replace with your function ARN
+      FunctionName: `arn:aws:lambda:eu-west-2:${process.env.AWS_ACCOUNT}:function:welcomefunction`, // replace with your function ARN
       InvocationType: "Event",
       Payload: Buffer.from(payload),
     };

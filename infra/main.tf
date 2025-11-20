@@ -379,6 +379,7 @@ resource "aws_launch_template" "ecslaunch_template" {
                 systemctl start docker
                 echo ECS_CLUSTER=${aws_ecs_cluster.my_ecs.name} > /etc/ecs/ecs.config
                 echo ECS_ENABLE_AWSLOGS_EXECUTIONROLE_OVERRIDE=true >> /etc/ecs/ecs.config
+                echo ECS_WARM_POOLS_CHECK=true >> /etc/ecs/ecs.config
                 EOF
   )
   depends_on = [aws_ecs_cluster.my_ecs] # <<< ensures cluster exists first
@@ -454,7 +455,7 @@ resource "aws_ecs_capacity_provider" "my_capacity_provider" {
     managed_termination_protection = "DISABLED"
     managed_scaling {
       status                    = "ENABLED"
-      target_capacity           = 75
+      target_capacity           = 3
       minimum_scaling_step_size = 1
       maximum_scaling_step_size = 10
     }
@@ -548,6 +549,10 @@ resource "aws_ecs_task_definition" "blog_app_task" {
           name      = "S3_BUCKET_REGION"
           valueFrom = "/blog-app/S3_BUCKET_REGION"
         },
+        {
+          name = "AWS_ACCOUNT"
+          valueFrom = "/blog-app/AWS_ACCOUNT"
+        }
       ]
     }
   ])
@@ -570,16 +575,17 @@ resource "aws_ecs_service" "blog_app_service" {
   cluster              = var.myecs_clustername
   force_new_deployment = true
   task_definition      = aws_ecs_task_definition.blog_app_task.arn
-  desired_count        = 4
+  desired_count        = var.replica_count
   scheduling_strategy  = "REPLICA"
   deployment_minimum_healthy_percent = 0
   health_check_grace_period_seconds = 60
-  deployment_configuration {
-    bake_time_in_minutes = 1
+  capacity_provider_strategy {
+    capacity_provider = aws_ecs_capacity_provider.my_capacity_provider.name
+    weight = 100
   }
   ordered_placement_strategy {
-    type  = "random"
-    //field = "cpu"
+    type  = "spread"
+    field = "instanceId"
 
 
   }
@@ -589,10 +595,9 @@ resource "aws_ecs_service" "blog_app_service" {
     container_name   = "blog_app_container"
     container_port   = 3001
   }
-  depends_on = [aws_lb_target_group.blogapp_tg,
-    aws_ecs_cluster_capacity_providers.blog_ecs_cluster_capacity,
+  depends_on = [module.autoscaling]
    
-  ]
+  
 
 
 }

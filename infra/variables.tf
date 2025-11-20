@@ -68,3 +68,8 @@ variable "myrepo" {
 }
 
 
+variable "replica_count"{
+  description = "No of containers to run"
+  type = number
+  default = 2
+}
