@@ -86,11 +86,11 @@ Auto Scaling → EC2 instances scale up/down using ASG and ECS Capacity Provider
 
 #########                                                                                            ####
                  USER
-            ┌───────────────────────────────┐
+            ┌───────────────────────────────┐                                                       #
             │          Internet             │
             └─────────────┬─────────────────┘
                           │
-                    HTTPS / HTTP
+                    HTTPS / HTTP                                                                      #
                           │
              ┌────────────▼─────────────┐
              │      ALB (Public)        │
@@ -102,7 +102,7 @@ Auto Scaling → EC2 instances scale up/down using ASG and ECS Capacity Provider
              │ECS- EC2 ASG   │ │ECS EC2 ASG│
              │ Private Subnet│ │ Private Subnet
              │ Container:    │ │ Container: 3001 PORT  
-             │ blog_app      │ │ blog_app
+             │ blog_app      │ │ blog_app                                                                      #
              │ Docker Image  │ │ Docker Image
              └───────┬───────┘ └────┬──────┘
                      │              │
@@ -118,7 +118,7 @@ Auto Scaling → EC2 instances scale up/down using ASG and ECS Capacity Provider
                      │ blog images     │
                      └─────────────────┘       
                              |
-                     ┌─────────────────┐
+                     ┌─────────────────┐                                                                #
                      │ Lambda Function │
                      │ Sends Welcome   │
                      │ Email via SES   │
