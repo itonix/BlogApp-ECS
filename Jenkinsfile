@@ -41,7 +41,15 @@ CMD ["node", "index.js"]'''
             when { expression { params.ACTION == 'BUILD' } }
             steps {
                 dir('Blog-App') {
-                    sh "docker buildx build -t tonygeorgethomas/blog_app:latest --push ."
+
+                 withCredentials([usernamePassword(credentialsId: '144bc174-cf73-49bf-9efb-7b0598a9ee0f', passwordVariable: 'PASS', usernameVariable: 'USER')]) {
+    // some block
+    sh """
+       echo "$PASS" | docker login -u "$USER" --password-stdin
+       docker buildx build -t tonygeorgethomas/blog_app:latest --push .
+    """
+     
+}
                 }
             }
         }
