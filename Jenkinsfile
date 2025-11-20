@@ -42,7 +42,7 @@ CMD ["node", "index.js"]'''
             steps {
                 dir('Blog-App') {
 
-                 withCredentials([usernamePassword(credentialsId: '508428c5-61d5-4b34-8601-5f9c11113ce9', passwordVariable: 'PASS', usernameVariable: 'USER')]) {
+                 withCredentials([usernamePassword(credentialsId: '314e5bd0-3275-4a92-81d7-0bb89016d12f', passwordVariable: 'PASS', usernameVariable: 'USER')]) {
     // some block
     sh '''
        echo "$PASS" | docker login -u "$USER" --password-stdin
@@ -101,7 +101,7 @@ terraform {
 
 '''
 
-                    withCredentials([string(credentialsId: 'db8861f4-09ef-4677-85fd-a32e1c95ac14', variable: 'TFC_TOKEN')]) {
+                    withCredentials([string(credentialsId: '79fbf8d7-6884-4bda-aae6-f562f4b083ba', variable: 'TFC_TOKEN')]) {
                         sh '''
                             export TF_TOKEN_app_terraform_io=$TFC_TOKEN
                             terraform fmt -recursive
@@ -118,7 +118,7 @@ terraform {
             when { expression { params.ACTION == 'BUILD' } }
             steps {
                 dir('infra') {
-                    withCredentials([string(credentialsId: 'db8861f4-09ef-4677-85fd-a32e1c95ac14', variable: 'TFC_TOKEN')]) {
+                    withCredentials([string(credentialsId: '79fbf8d7-6884-4bda-aae6-f562f4b083ba', variable: 'TFC_TOKEN')]) {
                         sh '''
                             export TF_TOKEN_app_terraform_io=$TFC_TOKEN
                             terraform plan -input=false
@@ -156,7 +156,7 @@ terraform {
 
                         int containerCount = containernumber.toInteger()
 
-                        withCredentials([string(credentialsId: 'db8861f4-09ef-4677-85fd-a32e1c95ac14', variable: 'TFC_TOKEN')]) {
+                        withCredentials([string(credentialsId: '79fbf8d7-6884-4bda-aae6-f562f4b083ba', variable: 'TFC_TOKEN')]) {
                             sh """
                                 export TF_TOKEN_app_terraform_io=$TFC_TOKEN
                                 export TF_VAR_replica_count=${containerCount}
@@ -187,7 +187,7 @@ terraform {
                     error("User selected NO. Aborting destroy.")
                 }
 
-                withCredentials([string(credentialsId: 'db8861f4-09ef-4677-85fd-a32e1c95ac14', variable: 'TFC_TOKEN')]) {
+                withCredentials([string(credentialsId: '79fbf8d7-6884-4bda-aae6-f562f4b083ba', variable: 'TFC_TOKEN')]) {
 
                     sh """
                         export TF_TOKEN_app_terraform_io=$TFC_TOKEN
