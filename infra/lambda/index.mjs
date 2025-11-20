@@ -9,7 +9,7 @@ export const handler = async (event) => {
   const subject = `Welcome ${customerName} from Blog-APP`;
   const response = await s3.send(new GetObjectCommand({
     
-    Bucket: "my-wemail-template",
+    Bucket: "my-wemail-template1",
     Key: "welcomemail.html"
   }));
   

@@ -46,11 +46,11 @@ variable "principle_arn" {
   default     = "arn:aws:iam::895581202168:user/Appuser"
 }
 
-# variable "custom_role" {
-#   description = "The name of the custom IAM role"
-#   type        = string
-#   default = ""
-# }
+variable "custom_role" {
+  description = "The name of the custom IAM role"
+  type        = string
+  default     = ""
+}
 
 variable "ses_identities" {
   default = [
@@ -60,9 +60,16 @@ variable "ses_identities" {
   ]
 }
 
+
 variable "myrepo" {
   description = "ECR public repository name"
   type        = string
-  default     = "itonix/blog_app"
-  
+  default     = "tonygeorgethomas/blog_app:latest"
+}
+
+
+variable "replica_count"{
+  description = "No of containers to run"
+  type = number
+  default = 2
 }

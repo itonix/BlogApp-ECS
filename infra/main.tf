@@ -11,6 +11,17 @@ provider "aws" {
   }
 }
 
+
+
+# Additional provider for ECR Public (in us-east-1)
+provider "aws" {
+  alias  = "us_east_1"
+  region = "us-east-1"
+}
+
+
+
+
 data "aws_region" "current" {}
 
 data "aws_caller_identity" "current" {}
@@ -58,7 +69,7 @@ output "Az" {
 resource "aws_subnet" "publicsubnets" {
 
   vpc_id                  = aws_vpc.blog_vpc.id
-  count                   = length(local.azs) - 1
+  count                   = length(local.azs) 
   cidr_block              = cidrsubnet(aws_vpc.blog_vpc.cidr_block, 7, count.index)
   map_public_ip_on_launch = "true"
   availability_zone       = local.azs[count.index]
@@ -326,20 +337,11 @@ output "ecs_ami_id" {
   sensitive = true
 }
 
-####
-variable "ecs_cluster_name" {
-  description = "Name of the ECS cluster"
-  type        = string
-  default     = "ECS-Cluster"
 
-}
 
 # # #########################################################launc template for autoscaling group#####
 
-#import existing iam instance profile
-data "aws_iam_instance_profile" "ecs_instance_profile" {
-  name = "ecsInstanceRole"
-}
+
 
 
 
@@ -350,7 +352,7 @@ resource "aws_launch_template" "ecslaunch_template" {
   image_id = data.aws_ssm_parameter.ecs_ami_id.value
   iam_instance_profile {
     //name = "EC2App-test"
-    name = data.aws_iam_instance_profile.ecs_instance_profile.name
+    name = module.iam_instance_profile.instanceprofile_name
   }
   instance_initiated_shutdown_behavior = "terminate"
   vpc_security_group_ids               = [aws_security_group.ec2_securitygrp.id] # <- use this
@@ -373,10 +375,14 @@ resource "aws_launch_template" "ecslaunch_template" {
 
   user_data = base64encode(<<-EOF
                 #!/bin/bash
+                systemctl enable docker
+                systemctl start docker
+                echo ECS_CLUSTER=${aws_ecs_cluster.my_ecs.name} > /etc/ecs/ecs.config
                 echo ECS_ENABLE_AWSLOGS_EXECUTIONROLE_OVERRIDE=true >> /etc/ecs/ecs.config
-                echo ECS_CLUSTER=${var.ecs_cluster_name} >> /etc/ecs/ecs.config
+                echo ECS_WARM_POOLS_CHECK=true >> /etc/ecs/ecs.config
                 EOF
   )
+  depends_on = [aws_ecs_cluster.my_ecs] # <<< ensures cluster exists first
 }
 
 
@@ -394,71 +400,61 @@ data "aws_key_pair" "deployer_key" {
 
 
 
-# # ##########################################################Auto scaling group module
+# # ##########################################################Auto scaling group 
 
-module "autoscaling" {
-  source  = "terraform-aws-modules/autoscaling/aws"
-  version = "9.0.1"
-  # insert the 1 required variable here
-  name            = "ecs-autoscaling-group"
-  use_name_prefix = true
-  # and any of the optional variables you want here   
+
+resource "aws_autoscaling_group" "ecs-autoscaling-group" {
+  name                      = "ecs-autoscaling-group"
+  max_size                  = 3
   min_size                  = 1
-  max_size                  = 2
-  desired_capacity          = 0
+  health_check_grace_period = 100
   health_check_type         = "EC2"
-  health_check_grace_period = 300 #seconds
-  vpc_zone_identifier       = aws_subnet.privatesubnets[*].id
-  # Launch template
-  launch_template_id      = aws_launch_template.ecslaunch_template.id
-  launch_template_version = "$Latest"
-  instance_type           = "t2.micro"
-  instance_name           = "asg-instances"
-  create_launch_template  = false
-  depends_on              = [aws_launch_template.ecslaunch_template]
-  # tags = {
-  #   Environment         = terraform.workspace
-  #   Project             = "megasecret"
-  #   propagate_at_launch = true
-  # }
-  autoscaling_group_tags = [
-    {
-      key                 = "Environment"
-      value               = terraform.workspace
-      propagate_at_launch = true
-    },
-    {
-      key                 = "Project"
-      value               = "megasecret"
-      propagate_at_launch = true
-    },
-    {
-      key                 = "AmazonECSManaged"
-      value               = "true"
-      propagate_at_launch = true
-    }
-  ]
-  
+  desired_capacity          = 2
+  force_delete              = false
+  launch_template {
+    id      = aws_launch_template.ecslaunch_template.id
+    version = aws_launch_template.ecslaunch_template.latest_version
+  }
+  vpc_zone_identifier = aws_subnet.privatesubnets[*].id
 
+  instance_maintenance_policy {
+    min_healthy_percentage = 90
+    max_healthy_percentage = 120
+  }
 
+  timeouts {
+    delete = "3m"
+  }
+
+  tag {
+    key                 = "AmazonECSManaged"
+    value               = true
+    propagate_at_launch = true
+  }
 }
 
+
+//////////////////////////////////////////
+
+
+
+
+
 output "autoscaling_group_name" {
-  value = module.autoscaling.autoscaling_group_name
+  value = aws_autoscaling_group.ecs-autoscaling-group.name
 }
 
 
 ////ecs capacity provider///
-resource "aws_ecs_capacity_provider" "ecs_capacity_provider" {
-  name = "ecs-capacity-provider"
+resource "aws_ecs_capacity_provider" "my_capacity_provider" {
+  name = "my_capacity_provider"
 
   auto_scaling_group_provider {
-    auto_scaling_group_arn         = module.autoscaling.autoscaling_group_arn
-    managed_termination_protection = "ENABLED"
-
+    auto_scaling_group_arn         = aws_autoscaling_group.ecs-autoscaling-group.arn
+    managed_termination_protection = "DISABLED"
     managed_scaling {
       status                    = "ENABLED"
-      target_capacity           = 75
+      target_capacity           = 100
       minimum_scaling_step_size = 1
       maximum_scaling_step_size = 10
     }
@@ -470,37 +466,34 @@ resource "aws_ecs_capacity_provider" "ecs_capacity_provider" {
 }
 
 
-##### pull public container from ECR repository######
 
+##### pull public container from dockerhub repository######
 
-
-data "aws_ecr_public_repository" "blog_app_repo" {
-  repository_name = var.myrepo
+locals {
+  blog_image_uri = "tonygeorgethomas/blog_app:latest"
 }
 
-output "imagee" {
-  value = "${data.aws_ecr_public_repository.blog_app_repo.repository_uri}:latest"
-}
 
-resource "aws_ecs_task_definition" "service" {
+resource "aws_ecs_task_definition" "blog_app_task" {
   family                   = "service"
   requires_compatibilities = ["EC2"]
   network_mode             = "bridge"
-  task_role_arn              = module.iam.blogapp_role_arn
-  execution_role_arn         = module.iam.blogapp_role_arn
-  cpu                        = "256"  
-  memory                     = "512"
+  task_role_arn            = module.iam_task_role.taskrole_arn
+  execution_role_arn       = module.iam_ecstaskexectionrole.ecstaskexecution_role_arn
+  cpu                      = "128"
+  memory                   = "128"
   container_definitions = jsonencode([
     {
       name      = "blog_app_container"
-      image     = "${data.aws_ecr_public_repository.blog_app_repo.repository_uri}:latest"
-      cpu       = 256
-      memory    = 512
+      image     = local.blog_image_uri #using public repo
+      cpu       = 128
+      memory    = 128
       essential = true
       portMappings = [
         {
           containerPort = 3001
-          hostPort      = 80
+          hostPort      = 0 #host port 0 means dynamic port mapping since using bridge mode
+          protocol      = "tcp"
         }
       ]
       secrets = [
@@ -519,26 +512,30 @@ resource "aws_ecs_task_definition" "service" {
         {
           name      = "S3_BUCKET_NAME"
           valueFrom = "/blog-app/S3_BUCKET_NAME"
-        },{
-          name     = "DB_NAME"
+          }, {
+          name      = "DB_NAME"
           valueFrom = "/blog-app/DB_NAME"
         },
         {
-          name     = "AWS_REGION"
+          name      = "AWS_REGION"
           valueFrom = "/blog-app/AWS_REGION"
         },
         {
-          name     = "DB_PORT"
+          name      = "DB_PORT"
           valueFrom = "/blog-app/DB_PORT"
         },
         {
-          name = "S3_BUCKET_NAME_TEMPLATE"
+          name      = "S3_BUCKET_NAME_TEMPLATE"
           valueFrom = "/blog-app/S3_BUCKET_NAME_TEMPLATE"
         },
         {
-          name = "S3_BUCKET_REGION"
+          name      = "S3_BUCKET_REGION"
           valueFrom = "/blog-app/S3_BUCKET_REGION"
         },
+        {
+          name = "AWS_ACCOUNT"
+          valueFrom = "/blog-app/AWS_ACCOUNT"
+        }
       ]
     }
   ])
@@ -546,86 +543,196 @@ resource "aws_ecs_task_definition" "service" {
 
 
 
+
+
+
+###################aws_ecs_cluster_capacity_providers###
+resource "aws_ecs_cluster_capacity_providers" "blog_ecs_cluster_capacity" {
+  cluster_name = var.myecs_clustername
+
+  capacity_providers = [
+    aws_ecs_capacity_provider.my_capacity_provider.name,
+  ]
+
+  default_capacity_provider_strategy {
+    base   = 0
+    weight = 1
+
+    capacity_provider = aws_ecs_capacity_provider.my_capacity_provider.name
+  }
+}
+
+
+
+
+############################ ecs service creation ##########################
+
+
+
+
+resource "aws_ecs_service" "blog_app_service" {
+  name                 = "app-service"
+  cluster              = var.myecs_clustername
+  force_new_deployment = true
+  force_delete                       = true
+  task_definition      = aws_ecs_task_definition.blog_app_task.arn
+  desired_count        = var.replica_count
+  scheduling_strategy  = "REPLICA"
+  deployment_minimum_healthy_percent = 0
+  health_check_grace_period_seconds = 60
+  capacity_provider_strategy {
+    capacity_provider = aws_ecs_capacity_provider.my_capacity_provider.name
+    weight = 100
+  }
+  ordered_placement_strategy {
+    type  = "spread"
+    field = "instanceId"
+
+
+  }
+
+  load_balancer {
+    target_group_arn = aws_lb_target_group.blogapp_tg.arn
+    container_name   = "blog_app_container"
+    container_port   = 3001
+  }
+  depends_on = [    aws_lb_listener.app_listener,
+    aws_lb_target_group.blogapp_tg,
+    aws_lb.frontend_lb,
+    aws_ecs_cluster_capacity_providers.blog_ecs_cluster_capacity,
+    aws_autoscaling_group.ecs-autoscaling-group,
+    module.iam_instance_profile.aws_iam_role_policy_attachment,
+    module.iam_ecstaskexectionrole]
+   
+  
+
+
+}
+
 /////////////////////////////////ECS-cluster creation##########################
 
+variable "myecs_clustername" {
+  description = "Name of the ECS cluster"
+  type        = string
+  default     = "my-ecs-cluster"
 
-module "ecs_cluster" {
-  source = "terraform-aws-modules/ecs/aws//modules/cluster"
+}
+///////
+resource "aws_ecs_cluster" "my_ecs" {
+  name = var.myecs_clustername
 
-  name = "ecs-ec2"
+  setting {
+    name  = "containerInsights"
+    value = "enabled"
+  }
 
-  configuration = {
-    execute_command_configuration = {
+  configuration {
+    execute_command_configuration {
       logging = "OVERRIDE"
-      log_configuration = {
+
+      log_configuration {
         cloud_watch_log_group_name = "/aws/ecs/aws-ec2"
       }
     }
   }
-
-  default_capacity_provider_strategy = [
-    {
-      capacity_provider = aws_ecs_capacity_provider.ecs_capacity_provider.name
-      base              = 1
-      weight            = 1
-    }
-  ]
   tags = {
     Environment = "Development"
     Project     = "EcsEc2"
   }
-  }
+}
 
-  
+
+
+
+
+///////
+# module "ecs_cluster" {
+#   source = "terraform-aws-modules/ecs/aws//modules/cluster"
+
+#   name                    = var.myecs_clustername
+#   create_task_exec_policy = false
+#   configuration = {
+#     execute_command_configuration = {
+#       logging = "OVERRIDE"
+#       log_configuration = {
+#         cloud_watch_log_group_name = "/aws/ecs/aws-ec2"
+#       }
+#     }
+#   }
+
+
+#   tags = {
+#     Environment = "Development"
+#     Project     = "EcsEc2"
+#   }
+# }
+
+
 ###########################################
+locals {
+  ecs_cluster_name = aws_ecs_cluster.my_ecs.name
+}
+
+locals {
+
+  cluster_id = aws_ecs_cluster.my_ecs.id
+}
 
 
 
-
-
-
+###############################################################
+resource "aws_security_group_rule" "allow_alb_to_ec2_ephemeral" {
+  type                     = "ingress"
+  from_port                = 32768
+  to_port                  = 61000 # or  prefer
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.ec2_securitygrp.id
+  source_security_group_id = aws_security_group.vpc_securitygrp.id # ALB SG
+}
 
 
 
 # # ############################################################ setting for load balancer- application load balancer
-# resource "aws_lb" "frontend_lb" {
-#   name               = "frontend-lb"
-#   internal           = false
-#   load_balancer_type = "application"
-#   security_groups    = [aws_security_group.vpc_securitygrp.id]
-#   subnets            = aws_subnet.publicsubnets[*].id
+resource "aws_lb" "frontend_lb" {
+  name               = "frontend-lb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.vpc_securitygrp.id]
+  subnets            = aws_subnet.publicsubnets[*].id
 
-#   tags = {
-#     Name        = "frontend-lb"
-#     Environment = terraform.workspace
-#   }
-# }
-# # # Create a target group for the load balancer
-# resource "aws_lb_target_group" "blogapp_tg" {
-#   name     = "blogapp-tg"
-#   port     = 80
-#   protocol = "HTTP"
-#   vpc_id   = aws_vpc.blog_vpc.id
-#   # stickiness {
-#   #   type            = "lb_cookie"
-#   #   cookie_duration = 3600 # 1 hour
-#   #   enabled         = true
-#   # }
+  tags = {
+    Name        = "frontend-lb"
+    Environment = terraform.workspace
+  }
+}
+# # Create a target group for the load balancer
+resource "aws_lb_target_group" "blogapp_tg" {
+  name        = "blogapp-tg"
+  port        = 3001 #container port
+  protocol    = "HTTP"
+  vpc_id      = aws_vpc.blog_vpc.id
+  target_type = "instance"
+  # stickiness {
+  #   type            = "lb_cookie"
+  #   cookie_duration = 3600 # 1 hour
+  #   enabled         = true
+  # }
+  deregistration_delay = 10 
 
-#   health_check {
-#     path                = "/"
-#     interval            = 30
-#     timeout             = 5
-#     healthy_threshold   = 5
-#     unhealthy_threshold = 2
-#     matcher             = "200-399"
-#   }
+  health_check {
+    path                = "/"
+    interval            = 10
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    matcher             = "200-399"
+  }
 
-#   tags = {
-#     Name        = "blogapp-tg"
-#     Environment = terraform.workspace
-#   }
-# }
+  tags = {
+    Name        = "blogapp-tg"
+    Environment = terraform.workspace
+  }
+}
 # # # ///////////////////////////////////////////////////
 
 
@@ -633,40 +740,40 @@ module "ecs_cluster" {
 
 # # # ###http to https redirection listener
 
-# resource "aws_lb_listener" "http_redirect" {
-#   load_balancer_arn = aws_lb.frontend_lb.arn
-#   port              = "80"
-#   protocol          = "HTTP"
+resource "aws_lb_listener" "http_redirect" {
+  load_balancer_arn = aws_lb.frontend_lb.arn
+  port              = "80"
+  protocol          = "HTTP"
 
-#   default_action {
-#     type = "redirect"
+  default_action {
+    type = "redirect"
 
-#     redirect {
-#       port        = "443"
-#       protocol    = "HTTPS"
-#       status_code = "HTTP_301"
-#     }
-#   }
-# }
-
-
-
-# resource "aws_lb_listener" "app_listener" {
-#   load_balancer_arn = aws_lb.frontend_lb.arn
-#   port              = "443"
-#   protocol          = "HTTPS"
-#   ssl_policy        = "ELBSecurityPolicy-2016-08"
-#   certificate_arn   = data.aws_acm_certificate.cert.arn
-
-#   default_action {
-#     type             = "forward"
-#     target_group_arn = aws_lb_target_group.blogapp_tg.arn
-#   }
-# }
+    redirect {
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_301"
+    }
+  }
+}
 
 
 
-# # Attach the Auto Scaling Group to the Target Group
+resource "aws_lb_listener" "app_listener" {
+  load_balancer_arn = aws_lb.frontend_lb.arn
+  port              = "443"
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-2016-08"
+  certificate_arn   = data.aws_acm_certificate.cert.arn
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.blogapp_tg.arn
+  }
+}
+
+
+
+# # # Attach the Auto Scaling Group to the Target Group
 # resource "aws_autoscaling_attachment" "asg_attachment" {
 #   autoscaling_group_name = module.autoscaling.autoscaling_group_name
 #   lb_target_group_arn    = aws_lb_target_group.blogapp_tg.arn
@@ -686,251 +793,261 @@ data "aws_ssm_parameter" "db_pass" {
 
 
 # # #################################################################Create rds mariadb instance###
-# module "db" {
-#   source = "terraform-aws-modules/rds/aws"
+module "db" {
+  source = "terraform-aws-modules/rds/aws"
 
-#   identifier                  = "blog-db-instance"
-#   create_db_option_group      = false
-#   create_db_parameter_group   = false
-#   create_db_instance          = true
-#   create_monitoring_role      = false
-#   database_insights_mode      = "standard"
-#   manage_master_user_password = false
-#   engine                      = "mariadb"
-#   engine_version              = "11.4.5"
-#   instance_class              = "db.t4g.micro"
-#   allocated_storage           = 20
-#   storage_type                = "gp2"
-#   multi_az                    = false
-#   publicly_accessible         = false
-#   db_name                     = "blogdb"
-#   username                    = data.aws_ssm_parameter.db_user.value
-#   port                        = "3306"
-#   availability_zone           = local.azs[0]
-#   # subnet ids for the RDS instance
-#   create_db_subnet_group  = true
-#   subnet_ids              = aws_subnet.privatesubnets[*].id
-#   password                = data.aws_ssm_parameter.db_pass.value # ideally, use secrets manager or SSM parameter store to fetch this value
-#   skip_final_snapshot     = true
-#   backup_retention_period = 0
-#   vpc_security_group_ids  = [aws_security_group.rds_securitygrp.id]
-#   # Enhanced Monitoring - see example for details on how to create the role
-#   # by yourself, in case you don't want to create it automatically
-#   tags = {
-#     Owner       = "user"
-#     Environment = terraform.workspace
-#   }
+  identifier                  = "blog-db-instance"
+  create_db_option_group      = false
+  create_db_parameter_group   = false
+  create_db_instance          = true
+  create_monitoring_role      = false
+  database_insights_mode      = "standard"
+  manage_master_user_password = false
+  engine                      = "mariadb"
+  engine_version              = "11.4.5"
+  instance_class              = "db.t4g.micro"
+  allocated_storage           = 20
+  storage_type                = "gp2"
+  multi_az                    = false
+  publicly_accessible         = false
+  db_name                     = "blogdb"
+  username                    = data.aws_ssm_parameter.db_user.value
+  port                        = "3306"
+  availability_zone           = local.azs[0]
+  # subnet ids for the RDS instance
+  create_db_subnet_group  = true
+  subnet_ids              = aws_subnet.privatesubnets[*].id
+  password                = data.aws_ssm_parameter.db_pass.value # ideally, use secrets manager or SSM parameter store to fetch this value
+  skip_final_snapshot     = true
+  backup_retention_period = 0
+  vpc_security_group_ids  = [aws_security_group.rds_securitygrp.id]
+  # Enhanced Monitoring - see example for details on how to create the role
+  # by yourself, in case you don't want to create it automatically
+  tags = {
+    Owner       = "user"
+    Environment = terraform.workspace
+  }
 
-# }
+}
 
 
 
 # # # # #create ################################     S3bucket for storing blog images  #######
-# resource "aws_s3_bucket" "blog_app_bucket" {
-#   bucket = var.s3_bucket_name
-#   tags = {
-#     Name        = "Blog App Bucket"
-#     Environment = terraform.workspace
-#   }
-# }
+resource "aws_s3_bucket" "blog_app_bucket" {
+  bucket = var.s3_bucket_name
+  tags = {
+    Name        = "Blog App Bucket"
+    Environment = terraform.workspace
+  }
+}
 
-# # #bucket encryption using KMS
-# resource "aws_s3_bucket_server_side_encryption_configuration" "blogapp_encryption" {
-#   bucket = aws_s3_bucket.blog_app_bucket.id
+# #bucket encryption using KMS
+resource "aws_s3_bucket_server_side_encryption_configuration" "blogapp_encryption" {
+  bucket = aws_s3_bucket.blog_app_bucket.id
 
-#   rule {
-#     bucket_key_enabled = true
-#   }
-# }
+  rule {
+    bucket_key_enabled = true
+  }
+}
 
 
 # # ###test s3
-# resource "aws_s3_bucket_policy" "blog_app_bucket_policy" {
-#   bucket     = aws_s3_bucket.blog_app_bucket.id
-#   depends_on = [aws_s3_bucket_public_access_block.blogapp_public_access]
-#   policy = jsonencode({
-#     "Version" : "2012-10-17",
-#     "Statement" : [
-#       {
-#         "Sid" : "AllowIAMUserAccess",
-#         "Effect" : "Allow",
-#         "Principal" : { "AWS" : "${var.principle_arn}" },
-#         "Action" : ["s3:GetObject", "s3:PutObject"],
-#         "Resource" : "arn:aws:s3:::${var.s3_bucket_name}/*"
-#       },
-#       {
-#         "Sid" : "PublicReadUploads",
-#         "Effect" : "Allow",
-#         "Principal" : "*",
-#         "Action" : ["s3:GetObject"],
-#         "Resource" : "arn:aws:s3:::${var.s3_bucket_name}/uploads/*"
-#       }
-#     ]
-#   })
-# }
+resource "aws_s3_bucket_policy" "blog_app_bucket_policy" {
+  bucket     = aws_s3_bucket.blog_app_bucket.id
+  depends_on = [aws_s3_bucket_public_access_block.blogapp_public_access]
+  policy = jsonencode({
+    "Version" : "2012-10-17",
+    "Statement" : [
+      {
+        "Sid" : "AllowIAMUserAccess",
+        "Effect" : "Allow",
+        "Principal" : { "AWS" : "${var.principle_arn}" },
+        "Action" : ["s3:GetObject", "s3:PutObject"],
+        "Resource" : "arn:aws:s3:::${var.s3_bucket_name}/*"
+      },
+      {
+        "Sid" : "PublicReadUploads",
+        "Effect" : "Allow",
+        "Principal" : "*",
+        "Action" : ["s3:GetObject"],
+        "Resource" : "arn:aws:s3:::${var.s3_bucket_name}/uploads/*"
+      }
+    ]
+  })
+}
 
 
 
 
 # # # CORS configuration to allow cross-origin requests
 
-# resource "aws_s3_bucket_cors_configuration" "blogapp_cors" {
-#   bucket = aws_s3_bucket.blog_app_bucket.id
+resource "aws_s3_bucket_cors_configuration" "blogapp_cors" {
+  bucket = aws_s3_bucket.blog_app_bucket.id
 
-#   cors_rule {
-#     allowed_headers = ["*"]
-#     allowed_methods = ["PUT", "POST"]
-#     allowed_origins = ["*"]
-#     expose_headers  = ["ETag"]
-#     max_age_seconds = 3000
-#   }
+  cors_rule {
+    allowed_headers = ["*"]
+    allowed_methods = ["PUT", "POST"]
+    allowed_origins = ["*"]
+    expose_headers  = ["ETag"]
+    max_age_seconds = 3000
+  }
 
-#   cors_rule {
-#     allowed_methods = ["GET"]
-#     allowed_origins = ["*"]
-#   }
-# }
+  cors_rule {
+    allowed_methods = ["GET"]
+    allowed_origins = ["*"]
+  }
+}
 
-# resource "aws_s3_bucket_ownership_controls" "blogapp_ownership" {
-#   bucket = aws_s3_bucket.blog_app_bucket.id
+resource "aws_s3_bucket_ownership_controls" "blogapp_ownership" {
+  bucket = aws_s3_bucket.blog_app_bucket.id
 
-#   rule {
-#     object_ownership = "BucketOwnerPreferred"
-#   }
-# }
+  rule {
+    object_ownership = "BucketOwnerPreferred"
+  }
+}
 
-# resource "aws_s3_bucket_public_access_block" "blogapp_public_access" {
-#   bucket = aws_s3_bucket.blog_app_bucket.id
+resource "aws_s3_bucket_public_access_block" "blogapp_public_access" {
+  bucket = aws_s3_bucket.blog_app_bucket.id
 
-#   block_public_acls       = false
-#   block_public_policy     = false
-#   ignore_public_acls      = false
-#   restrict_public_buckets = false
-# }
+  block_public_acls       = false
+  block_public_policy     = false
+  ignore_public_acls      = false
+  restrict_public_buckets = false
+}
 
 
 # # ################################################################################################## Lambda function to send welcome email using SES and S3
 # # # create lambda function and ses & s3 fetch
 # # # :my-wemail-template bucket is assuemd to be present and has the email template files stored in it. 
 
-# # # IAM role for Lambda execution
-# data "aws_iam_policy_document" "assume_role" {
-#   statement {
-#     effect = "Allow"
+# # IAM role for Lambda execution
+data "aws_iam_policy_document" "assume_role" {
+  statement {
+    effect = "Allow"
 
-#     principals {
-#       type        = "Service"
-#       identifiers = ["lambda.amazonaws.com"]
-#     }
+    principals {
+      type        = "Service"
+      identifiers = ["lambda.amazonaws.com"]
+    }
 
-#     actions = ["sts:AssumeRole"]
-#   }
-# }
+    actions = ["sts:AssumeRole"]
+  }
+}
 
-# resource "aws_iam_role" "lambda4_s3sesrole" {
-#   name               = "lambda4_s3sesrole"
-#   assume_role_policy = data.aws_iam_policy_document.assume_role.json
-# }
+resource "aws_iam_role" "lambda4_s3sesrole" {
+  name               = "lambda4_s3sesrole"
+  assume_role_policy = data.aws_iam_policy_document.assume_role.json
+}
 
-# resource "aws_iam_role_policy" "lambda_policy" {
-#   name = "lambda_s3_ses_policy"
-#   role = aws_iam_role.lambda4_s3sesrole.id
+resource "aws_iam_role_policy" "lambda_policy" {
+  name = "lambda_s3_ses_policy"
+  role = aws_iam_role.lambda4_s3sesrole.id
 
-#   policy = jsonencode({
-#     "Version" : "2012-10-17",
-#     "Statement" : [
-#       {
-#         "Action" : [
-#           "s3:GetObject",
-#           "s3:PutObject"
-#         ],
-#         "Effect" : "Allow",
-#         "Resource" : "arn:aws:s3:::${var.welcomemail_artifactbucket}/*",
-#         "Sid" : "Statement1"
-#       },
-#       {
-#         "Action" : [
-#           "ses:SendEmail",
-#           "ses:SendRawEmail",
-#           "ses:SendTemplatedEmail"
-#         ],
-#         "Effect" : "Allow",
-#         "Resource" : var.ses_identities,
-#         "Sid" : "Statement2"
-#       }
-#     ]
-#   })
-# }
+  policy = jsonencode({
+    "Version" : "2012-10-17",
+    "Statement" : [
+      {
+        "Action" : [
+          "s3:GetObject",
+          "s3:PutObject"
+        ],
+        "Effect" : "Allow",
+        "Resource" : "arn:aws:s3:::${var.welcomemail_artifactbucket}/*",
+        "Sid" : "Statement1"
+      },
+      {
+        "Action" : [
+          "ses:SendEmail",
+          "ses:SendRawEmail",
+          "ses:SendTemplatedEmail"
+        ],
+        "Effect" : "Allow",
+        "Resource" : var.ses_identities,
+        "Sid" : "Statement2"
+      }
+    ]
+  })
+}
 
 
 # # # Attach the AWSLambdaBasicExecutionRole policy to the role
-# resource "aws_iam_role_policy_attachment" "basicexecution" {
-#   role       = aws_iam_role.lambda4_s3sesrole.name
-#   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-# }
-# # Package the Lambda function code
-# data "archive_file" "ziparchive4lambda" {
-#   type        = "zip"
-#   source_dir  = "${path.module}/lambda"
-#   output_path = "${path.module}/lambda/welcomefunction.zip"
-# }
+resource "aws_iam_role_policy_attachment" "basicexecution" {
+  role       = aws_iam_role.lambda4_s3sesrole.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+# Package the Lambda function code
+data "archive_file" "ziparchive4lambda" {
+  type        = "zip"
+  source_dir  = "${path.module}/lambda"
+  output_path = "${path.module}/lambda/welcomefunction.zip"
+}
 
 # # Lambda function
-# resource "aws_lambda_function" "welcomefunction" {
-#   filename         = data.archive_file.ziparchive4lambda.output_path
-#   function_name    = "welcomefunction"
-#   role             = aws_iam_role.lambda4_s3sesrole.arn
-#   handler          = "index.handler"
-#   source_code_hash = data.archive_file.ziparchive4lambda.output_base64sha256
+resource "aws_lambda_function" "welcomefunction" {
+  filename         = data.archive_file.ziparchive4lambda.output_path
+  function_name    = "welcomefunction"
+  role             = aws_iam_role.lambda4_s3sesrole.arn
+  handler          = "index.handler"
+  source_code_hash = data.archive_file.ziparchive4lambda.output_base64sha256
 
-#   runtime = "nodejs20.x"
+  runtime = "nodejs20.x"
 
-#   tags = {
-#     Environment = "production"
-#     Application = "blogapp"
-#   }
-# }
+  tags = {
+    Environment = "production"
+    Application = "blogapp"
+  }
+}
 
 
 # # # ####################################lambda ends##########################
 
 
 # # #### ACM certificate for just4study.click###
-# data "aws_acm_certificate" "cert" {
-#   domain      = "*.just4study.click" # Must match the certificate domain
-#   statuses    = ["ISSUED"]
-#   most_recent = true
-#   types       = ["IMPORTED"] # Because your cert is imported
-#   # optional region override if needed
-#   # provider = aws.eu_west_2
-# }
+data "aws_acm_certificate" "cert" {
+  domain      = "*.just4study.click" # Must match the certificate domain
+  statuses    = ["ISSUED"]
+  most_recent = true
+  types       = ["IMPORTED"] # Because your cert is imported
+  # optional region override if needed
+  # provider = aws.eu_west_2
+}
 
 
 # # ### Attach the certificate to the ALB listener
-# resource "aws_lb_listener_certificate" "myssl_cert" {
-#   listener_arn    = aws_lb_listener.app_listener.arn
-#   certificate_arn = data.aws_acm_certificate.cert.arn
-# }
+resource "aws_lb_listener_certificate" "myssl_cert" {
+  listener_arn    = aws_lb_listener.app_listener.arn
+  certificate_arn = data.aws_acm_certificate.cert.arn
+}
 # # #########################cloudflare provider module##########################
 
-# # variable "cloudflare_zone_id" {
-# #   type        = string
-# #   description = "Cloudflare Zone ID for just4study.click"
-# # }
+variable "cloudflare_zone_id" {
+  type        = string
+  description = "Cloudflare Zone ID for just4study.click"
+}
 
 
-# # module "cloudflare" {
-# #   source             = "./modules/cloudflare"
-# #   alb_dns_name       = aws_lb.frontend_lb.dns_name
-# #   cloudflare_zone_id = var.cloudflare_zone_id
-# # }
+module "cloudflare" {
+  source             = "./modules/cloudflare"
+  alb_dns_name       = aws_lb.frontend_lb.dns_name
+  cloudflare_zone_id = var.cloudflare_zone_id #in tf cloud as env variable TF_VAR_cloudflare_zone_id
+}
 
 
 ### role for task execution and task role for ecs service and task definition  
 
-module "iam" {
-  source      = "./modules/iam"
+module "iam_task_role" {
+  source      = "./modules/iam_task_role"
   custom_role = "blogapp_role"
+}
+
+module "iam_ecstaskexectionrole" {
+  source = "./modules/iam_ecstaskexectionrole"
+
+}
+
+module "iam_instance_profile" {
+  source = "./modules/iam_instance_ecs_profile"
+
 }
 
 
