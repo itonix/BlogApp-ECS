@@ -11,9 +11,9 @@ output "s3_bucket_name" {
 }
 
 
-output "asg_name" {
-  value = module.autoscaling.autoscaling_group_name
-}
+# output "asg_name" {
+#   value = module.autoscaling.autoscaling_group_name
+# }
 
 output "frontend_lb_dns_name4cloudflare" {
   value = aws_lb.frontend_lb.dns_name
