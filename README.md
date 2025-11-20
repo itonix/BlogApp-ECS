@@ -85,44 +85,8 @@ Welcome Email for user signup → Lambda triggered by events in S3 → Sends ema
 Auto Scaling → EC2 instances scale up/down using ASG and ECS Capacity Provider.
 
 #########                                                                                            ####
-                 USER
-            ┌───────────────────────────────┐                                                       #
-            │          Internet             │
-            └─────────────┬─────────────────┘
-                          │
-                    HTTPS / HTTP                                                                      #
-                          │
-             ┌────────────▼─────────────┐
-             │      ALB (Public)        │
-             │ Security: VPC SG (80/443)│
-             └───────┬───────────┬──────┘    
-                     │           │
-                     │0          │ 0   PORT for DYNAMIC MAPPING
-             ┌───────▼───────┐ ┌─▼─────────┐
-             │ECS- EC2 ASG   │ │ECS EC2 ASG│
-             │ Private Subnet│ │ Private Subnet
-             │ Container:    │ │ Container: 3001 PORT  
-             │ blog_app      │ │ blog_app                                                                      #
-             │ Docker Image  │ │ Docker Image
-             └───────┬───────┘ └────┬──────┘
-                     │              │
-                     └───────┬──────┘
-                             │
-                     ┌───────▼────────┐
-                     │   RDS MariaDB   │
-                     │ Private Subnet  │
-                     └─────────────────┘
-                             |
-                     ┌─────────────────┐
-                     │ S3 Bucket       │
-                     │ blog images     │
-                     └─────────────────┘       
-                             |
-                     ┌─────────────────┐                                                                #
-                     │ Lambda Function │
-                     │ Sends Welcome   │
-                     │ Email via SES   │
-                     └─────────────────┘
+              <img width="445" height="636" alt="image" src="https://github.com/user-attachments/assets/9b07a270-73f0-4c13-a5e4-01a042372e76" />
+
        #########################################################                                           
 
 TF clould is given a federated role  `Securely access AWS from HCP Terraform using OIDC federation` .TF cloud uses env varibles like : 
