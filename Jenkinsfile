@@ -1,7 +1,9 @@
 pipeline {
 
     agent any
-
+    environment {
+        CLOUDFLARE_ZONE_ID = credentials('c97d41c2-a4b7-499f-8ea8-382d7ce4097d')   // <-- globally available
+    }
     parameters {
         choice(name: 'ACTION', choices: ['BUILD', 'REPLICA', 'DESTROY'], description: 'Pick what you like to do:')
         choice(name: 'GitBranch', choices: ['master', 'dev'], description: 'Pick the branch you like to clone:')
@@ -103,6 +105,7 @@ terraform {
 
                     withCredentials([string(credentialsId: '79fbf8d7-6884-4bda-aae6-f562f4b083ba', variable: 'TFC_TOKEN')]) {
                         sh '''
+                            export TF_VAR_cloudflare_zone_id=$CLOUDFLARE_ZONE_ID
                             export TF_TOKEN_app_terraform_io=$TFC_TOKEN
                             terraform fmt -recursive
                             terraform init -input=false
@@ -120,6 +123,7 @@ terraform {
                 dir('infra') {
                     withCredentials([string(credentialsId: '79fbf8d7-6884-4bda-aae6-f562f4b083ba', variable: 'TFC_TOKEN')]) {
                         sh '''
+                            export TF_VAR_cloudflare_zone_id=$CLOUDFLARE_ZONE_ID
                             export TF_TOKEN_app_terraform_io=$TFC_TOKEN
                             terraform plan -input=false
                         '''
@@ -158,6 +162,7 @@ terraform {
 
                         withCredentials([string(credentialsId: '79fbf8d7-6884-4bda-aae6-f562f4b083ba', variable: 'TFC_TOKEN')]) {
                             sh """
+                                export TF_VAR_cloudflare_zone_id=$CLOUDFLARE_ZONE_ID
                                 export TF_TOKEN_app_terraform_io=$TFC_TOKEN
                                 export TF_VAR_replica_count=${containerCount}
                                 terraform apply -input=false -auto-approve
