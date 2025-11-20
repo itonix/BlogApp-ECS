@@ -103,8 +103,9 @@ terraform {
                         sh '''
                             export TF_TOKEN_app_terraform_io=$TFC_TOKEN
                             terraform fmt -recursive
-                            terraform validate
                             terraform init -input=false
+                            terraform validate
+                            
                         '''
                     }
                 }
