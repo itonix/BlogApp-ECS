@@ -46,7 +46,7 @@ CMD ["node", "index.js"]'''
     // some block
     sh """
        echo "$PASS" | docker login -u "$USER" --password-stdin
-       docker buildx build -t tonygeorgethomas/blog_app:latest --push .
+       sudo docker buildx build -t tonygeorgethomas/blog_app:latest --push .
     """
      
 }
