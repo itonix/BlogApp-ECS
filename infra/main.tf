@@ -484,10 +484,10 @@ resource "aws_ecs_cluster_capacity_providers" "blog_ecs_cluster_capacity" {
 }
 
 
-##### pull public container from ECR repository######
+##### pull public container from dockerhub repository######
 
 locals {
-  blog_image_uri = "public.ecr.aws/w7l2n4u3/itonix/blog_app:latest"
+  blog_image_uri = "tonygeorgethomas/blog_app:latest"
 }
 
 

@@ -64,7 +64,7 @@ variable "ses_identities" {
 variable "myrepo" {
   description = "ECR public repository name"
   type        = string
-  default     = "itonix/blog_app"
+  default     = "tonygeorgethomas/blog_app:latest"
 }
 
 
