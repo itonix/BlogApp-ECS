@@ -12,7 +12,7 @@ pipeline {
     stages {
 
         stage('Stage 1: Git Clone') {
-            when { expression { params.ACTION == 'BUILD' } }
+            
             steps {
                 git branch: params.GitBranch,
                     url: 'https://github.com/itonix/BlogApp-ECS.git'
