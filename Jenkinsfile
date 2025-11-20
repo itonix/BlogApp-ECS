@@ -59,7 +59,6 @@ CMD ["node", "index.js"]'''
         }
 
         stage('Stage 4: Terraform Init') {
-            when { expression { params.ACTION == 'BUILD' } }
             steps {
                 dir('infra') {
                     writeFile file: "terraform.tf", text: '''
@@ -165,6 +164,7 @@ terraform {
                                 export TF_VAR_cloudflare_zone_id=$CLOUDFLARE_ZONE_ID
                                 export TF_TOKEN_app_terraform_io=$TFC_TOKEN
                                 export TF_VAR_replica_count=${containerCount}
+                                terraform init -input=false
                                 terraform apply -input=false -auto-approve
                             """
                         }
@@ -197,7 +197,7 @@ terraform {
                     sh """
                         export TF_TOKEN_app_terraform_io=$TFC_TOKEN
                         export TF_VAR_replica_count=0
-
+                        terraform init -input=false
                         # Step 1 — Gracefully scale ECS service to zero
                         terraform apply -auto-approve
 
