@@ -62,7 +62,7 @@ CMD ["node", "index.js"]'''
             when { expression { params.ACTION == 'BUILD' } }
             steps {
                 dir('infra') {
-                    writeFile file: "infra/terraform.tf", text: '''
+                    writeFile file: "terraform.tf", text: '''
 terraform {
   required_version = ">= 1.4.6"
   required_providers {
