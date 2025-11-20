@@ -4,7 +4,7 @@ pipeline {
 
     parameters {
         choice(name: 'ACTION', choices: ['BUILD', 'REPLICA', 'DESTROY'], description: 'Pick what you like to do:')
-        choice(name: 'GitBranch', choices: ['MASTER/MAIN', 'DEV'], description: 'Pick the branch you like to clone:')
+        choice(name: 'GitBranch', choices: ['master', 'dev'], description: 'Pick the branch you like to clone:')
     }
 
     stages {
