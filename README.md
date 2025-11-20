@@ -95,13 +95,13 @@ Auto Scaling → EC2 instances scale up/down using ASG and ECS Capacity Provider
              ┌────────────▼─────────────┐
              │      ALB (Public)        │
              │ Security: VPC SG (80/443)│
-#            └───────┬───────────┬──────┘    #
+             └───────┬───────────┬──────┘    
                      │           │
                      │0          │ 0   PORT for DYNAMIC MAPPING
              ┌───────▼───────┐ ┌─▼─────────┐
              │ECS- EC2 ASG   │ │ECS EC2 ASG│
              │ Private Subnet│ │ Private Subnet
-#            │ Container:    │ │ Container: 3001 PORT  #
+             │ Container:    │ │ Container: 3001 PORT  
              │ blog_app      │ │ blog_app
              │ Docker Image  │ │ Docker Image
              └───────┬───────┘ └────┬──────┘
@@ -116,14 +116,14 @@ Auto Scaling → EC2 instances scale up/down using ASG and ECS Capacity Provider
                      ┌─────────────────┐
                      │ S3 Bucket       │
                      │ blog images     │
-#                    └─────────────────┘       #
+                     └─────────────────┘       
                              |
                      ┌─────────────────┐
                      │ Lambda Function │
                      │ Sends Welcome   │
                      │ Email via SES   │
                      └─────────────────┘
-#                                                   #
+       #########################################################                                           
 
 TF clould is given a federated role  `Securely access AWS from HCP Terraform using OIDC federation` .TF cloud uses env varibles like : 
 <img width="1056" height="407" alt="image" src="https://github.com/user-attachments/assets/0922d864-4b17-420c-bc9f-792bbd166542" />
