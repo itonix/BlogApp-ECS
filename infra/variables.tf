@@ -68,8 +68,15 @@ variable "myrepo" {
 }
 
 
-variable "replica_count"{
+variable "replica_count" {
   description = "No of containers to run"
-  type = number
-  default = 2
+  type        = number
+  default     = 2
+}
+
+variable "myecs_clustername" {
+  description = "Name of the ECS cluster"
+  type        = string
+  default     = "my-ecs-cluster"
+
 }

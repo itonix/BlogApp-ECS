@@ -69,7 +69,7 @@ output "Az" {
 resource "aws_subnet" "publicsubnets" {
 
   vpc_id                  = aws_vpc.blog_vpc.id
-  count                   = length(local.azs) 
+  count                   = length(local.azs)
   cidr_block              = cidrsubnet(aws_vpc.blog_vpc.cidr_block, 7, count.index)
   map_public_ip_on_launch = "true"
   availability_zone       = local.azs[count.index]
@@ -382,7 +382,7 @@ resource "aws_launch_template" "ecslaunch_template" {
                 echo ECS_WARM_POOLS_CHECK=true >> /etc/ecs/ecs.config
                 EOF
   )
-  depends_on = [aws_ecs_cluster.my_ecs] # <<< ensures cluster exists first
+  depends_on = [module.my_ecs] # <<< ensures cluster exists first
 }
 
 
@@ -533,7 +533,7 @@ resource "aws_ecs_task_definition" "blog_app_task" {
           valueFrom = "/blog-app/S3_BUCKET_REGION"
         },
         {
-          name = "AWS_ACCOUNT"
+          name      = "AWS_ACCOUNT"
           valueFrom = "/blog-app/AWS_ACCOUNT"
         }
       ]
@@ -548,7 +548,7 @@ resource "aws_ecs_task_definition" "blog_app_task" {
 
 ###################aws_ecs_cluster_capacity_providers###
 resource "aws_ecs_cluster_capacity_providers" "blog_ecs_cluster_capacity" {
-  cluster_name = var.myecs_clustername
+  cluster_name = module.my_ecs.my_ecs_name
 
   capacity_providers = [
     aws_ecs_capacity_provider.my_capacity_provider.name,
@@ -571,18 +571,18 @@ resource "aws_ecs_cluster_capacity_providers" "blog_ecs_cluster_capacity" {
 
 
 resource "aws_ecs_service" "blog_app_service" {
-  name                 = "app-service"
-  cluster              = var.myecs_clustername
-  force_new_deployment = true
+  name                               = "app-service"
+  cluster                            = module.my_ecs.my_ecs_name
+  force_new_deployment               = true
   force_delete                       = true
-  task_definition      = aws_ecs_task_definition.blog_app_task.arn
-  desired_count        = var.replica_count
-  scheduling_strategy  = "REPLICA"
+  task_definition                    = aws_ecs_task_definition.blog_app_task.arn
+  desired_count                      = var.replica_count
+  scheduling_strategy                = "REPLICA"
   deployment_minimum_healthy_percent = 0
-  health_check_grace_period_seconds = 60
+  health_check_grace_period_seconds  = 60
   capacity_provider_strategy {
     capacity_provider = aws_ecs_capacity_provider.my_capacity_provider.name
-    weight = 100
+    weight            = 100
   }
   ordered_placement_strategy {
     type  = "spread"
@@ -596,53 +596,53 @@ resource "aws_ecs_service" "blog_app_service" {
     container_name   = "blog_app_container"
     container_port   = 3001
   }
-  depends_on = [    aws_lb_listener.app_listener,
+  depends_on = [aws_lb_listener.app_listener,
     aws_lb_target_group.blogapp_tg,
     aws_lb.frontend_lb,
     aws_ecs_cluster_capacity_providers.blog_ecs_cluster_capacity,
     aws_autoscaling_group.ecs-autoscaling-group,
     module.iam_instance_profile.aws_iam_role_policy_attachment,
-    module.iam_ecstaskexectionrole]
-   
-  
+  module.iam_ecstaskexectionrole]
+
+
 
 
 }
 
 /////////////////////////////////ECS-cluster creation##########################
 
-variable "myecs_clustername" {
-  description = "Name of the ECS cluster"
-  type        = string
-  default     = "my-ecs-cluster"
 
-}
 ///////
-resource "aws_ecs_cluster" "my_ecs" {
-  name = var.myecs_clustername
+# resource "aws_ecs_cluster" "my_ecs" {
+#   name = var.myecs_clustername
 
-  setting {
-    name  = "containerInsights"
-    value = "enabled"
-  }
+#   setting {
+#     name  = "containerInsights"
+#     value = "enabled"
+#   }
 
-  configuration {
-    execute_command_configuration {
-      logging = "OVERRIDE"
+#   configuration {
+#     execute_command_configuration {
+#       logging = "OVERRIDE"
 
-      log_configuration {
-        cloud_watch_log_group_name = "/aws/ecs/aws-ec2"
-      }
-    }
-  }
-  tags = {
-    Environment = "Development"
-    Project     = "EcsEc2"
-  }
-}
+#       log_configuration {
+#         cloud_watch_log_group_name = "/aws/ecs/aws-ec2"
+#       }
+#     }
+#   }
+#   tags = {
+#     Environment = "Development"
+#     Project     = "EcsEc2"
+#   }
+# }
 
 
+# module "my_ecs" {
+#   source = "./modules/ecs_clustermod"
+#   name   = var.myecs_clustername
 
+
+# }
 
 
 ///////
@@ -670,12 +670,12 @@ resource "aws_ecs_cluster" "my_ecs" {
 
 ###########################################
 locals {
-  ecs_cluster_name = aws_ecs_cluster.my_ecs.name
+  ecs_cluster_name = module.my_ecs.my_ecs_name
 }
 
 locals {
 
-  cluster_id = aws_ecs_cluster.my_ecs.id
+  cluster_id = module.my_ecs.my_ecs_id
 }
 
 
@@ -717,7 +717,7 @@ resource "aws_lb_target_group" "blogapp_tg" {
   #   cookie_duration = 3600 # 1 hour
   #   enabled         = true
   # }
-  deregistration_delay = 10 
+  deregistration_delay = 10
 
   health_check {
     path                = "/"
@@ -1051,7 +1051,12 @@ module "iam_instance_profile" {
 }
 
 
+module "my_ecs" {
+  source = "./modules/ecs_clustermod"
+  name   = var.myecs_clustername
 
+
+}
 
 
 
