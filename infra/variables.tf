@@ -68,8 +68,20 @@ variable "myrepo" {
 }
 
 
-variable "replica_count"{
+variable "replica_count" {
   description = "No of containers to run"
-  type = number
-  default = 2
+  type        = number
+  default     = 5
+}
+
+variable "myecs_clustername" {
+  description = "Name of the ECS cluster"
+  type        = string
+  default     = "my-ecs-cluster"
+
+}
+
+variable "cloudflare_zone_id" {
+  type        = string
+  description = "Cloudflare Zone ID for just4study.click"
 }

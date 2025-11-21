@@ -6,9 +6,9 @@ output "lb_dns" {
 }
 
 
-output "s3_bucket_name" {
-  value = aws_s3_bucket.blog_app_bucket.bucket
-}
+# output "s3_bucket_name" {
+#   value = aws_s3_bucket.blog_app_bucket.bucket
+# }
 
 
 # output "asg_name" {
