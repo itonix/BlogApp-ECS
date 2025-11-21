@@ -1,3 +1,11 @@
+
+#BLOG APP :  A SIMPLE APPLICATION DEVELOPED IN HTML CSS JAVASCRIPT NODEJS runtime on EXPRESS  AND EJS(for templating)..The application expose port 3001 of container It is designed to allow user sign in , registration and posting blogs with one images .Connected backend to RDS Matiadb and S3 for saving images.
+
+To reduce the complexity we email tempalte is already posted in a S3 bucket and the terraform provisions one more bucket for storing user uploaded images under each user named paths.
+lambda function created through terraform fetches s3 mail template and replace name of user to send welcome mail for registration to platform this then trigger ses mail to be sent to user.
+
+The App and resources are kept minimal to be in limit to free tier ..you could improve this to another level by includingore services and upgrading project...
+
 BlogApp-ECS project is an ECS docker containerized  implimentation of earlier project in ec2-ASG-Autoscaling group.This project uses Terraform to provision and dismantle resources it creates.
 
 Jenkins is used here as the CICD tool.
