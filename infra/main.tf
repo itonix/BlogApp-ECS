@@ -346,43 +346,21 @@ output "ecs_ami_id" {
 
 
 
-resource "aws_launch_template" "ecslaunch_template" {
-  name = "ecslaunch-template"
+module "ecslaunch_template" {
+  source      = "./modules/launch_template_module"
+  name        = "ecslaunch-template"
+  clustername = module.my_ecs_cluster.my_ecs_name
+  imageid     = data.aws_ssm_parameter.ecs_ami_id.value
 
-  image_id = data.aws_ssm_parameter.ecs_ami_id.value
-  iam_instance_profile {
-    //name = "EC2App-test"
-    name = module.iam_instance_profile.instanceprofile_name
-  }
-  instance_initiated_shutdown_behavior = "terminate"
-  vpc_security_group_ids               = [aws_security_group.ec2_securitygrp.id] # <- use this
-  instance_type                        = "t2.micro"
-  key_name                             = data.aws_key_pair.deployer_key.key_name
+  //name = "EC2App-test"
+  iaminstanceprofile_name = module.iam_instance_profile.instanceprofile_name
+  vpcsecuritygroupids     = [aws_security_group.ec2_securitygrp.id] # <- use this
+  instancetype            = "t2.micro"
+  keynameto_use           = data.aws_key_pair.deployer_key.key_name
 
-  metadata_options {
-    http_endpoint               = "enabled"
-    http_tokens                 = "required"
-    http_put_response_hop_limit = 1
-    instance_metadata_tags      = "enabled"
-  }
-  tag_specifications {
-    resource_type = "instance"
 
-    tags = {
-      Name = "ecs-ec2-instance"
-    }
-  }
 
-  user_data = base64encode(<<-EOF
-                #!/bin/bash
-                systemctl enable docker
-                systemctl start docker
-                echo ECS_CLUSTER=${aws_ecs_cluster.my_ecs.name} > /etc/ecs/ecs.config
-                echo ECS_ENABLE_AWSLOGS_EXECUTIONROLE_OVERRIDE=true >> /etc/ecs/ecs.config
-                echo ECS_WARM_POOLS_CHECK=true >> /etc/ecs/ecs.config
-                EOF
-  )
-  depends_on = [module.my_ecs] # <<< ensures cluster exists first
+  depends_on = [module.my_ecs_cluster] # <<< ensures cluster exists first
 }
 
 
@@ -401,48 +379,38 @@ data "aws_key_pair" "deployer_key" {
 
 
 # # ##########################################################Auto scaling group 
+##### changing to autoscaling module#############
 
-
-resource "aws_autoscaling_group" "ecs-autoscaling-group" {
+module "ecs_autoscaling-group" {
+  source                    = "./modules/autoscaling"
   name                      = "ecs-autoscaling-group"
   max_size                  = 3
   min_size                  = 1
   health_check_grace_period = 100
   health_check_type         = "EC2"
   desired_capacity          = 2
-  force_delete              = false
-  launch_template {
-    id      = aws_launch_template.ecslaunch_template.id
-    version = aws_launch_template.ecslaunch_template.latest_version
-  }
+
+  launch_template_id      = module.ecslaunch_template.launch_template_id
+  launch_template_version = module.ecslaunch_template.launch_template_version
+
   vpc_zone_identifier = aws_subnet.privatesubnets[*].id
 
-  instance_maintenance_policy {
-    min_healthy_percentage = 90
-    max_healthy_percentage = 120
-  }
 
-  timeouts {
-    delete = "3m"
-  }
+  min_healthy_percentage = 90
+  max_healthy_percentage = 120
 
-  tag {
-    key                 = "AmazonECSManaged"
-    value               = true
-    propagate_at_launch = true
-  }
 }
 
 
-//////////////////////////////////////////
+# //////////////////////////////////////////
 
 
 
 
 
-output "autoscaling_group_name" {
-  value = aws_autoscaling_group.ecs-autoscaling-group.name
-}
+# output "autoscaling_group_name" {
+#   value = aws_autoscaling_group.ecs-autoscaling-group.name
+# }
 
 
 ////ecs capacity provider///
@@ -450,7 +418,7 @@ resource "aws_ecs_capacity_provider" "my_capacity_provider" {
   name = "my_capacity_provider"
 
   auto_scaling_group_provider {
-    auto_scaling_group_arn         = aws_autoscaling_group.ecs-autoscaling-group.arn
+    auto_scaling_group_arn         = module.ecs_autoscaling-group.auto_scaling_group_arn
     managed_termination_protection = "DISABLED"
     managed_scaling {
       status                    = "ENABLED"
@@ -474,81 +442,136 @@ locals {
 }
 
 
-resource "aws_ecs_task_definition" "blog_app_task" {
-  family                   = "service"
-  requires_compatibilities = ["EC2"]
-  network_mode             = "bridge"
-  task_role_arn            = module.iam_task_role.taskrole_arn
-  execution_role_arn       = module.iam_ecstaskexectionrole.ecstaskexecution_role_arn
-  cpu                      = "128"
-  memory                   = "128"
-  container_definitions = jsonencode([
+
+###to module conversion ##################Working
+
+
+# resource "aws_ecs_task_definition" "blog_app_task" {
+#   family                   = "service"
+#   requires_compatibilities = ["EC2"]
+#   network_mode             = "bridge"
+#   task_role_arn            = module.iam_task_role.taskrole_arn
+#   execution_role_arn       = module.iam_ecstaskexectionrole.ecstaskexecution_role_arn
+#   cpu                      = "128"
+#   memory                   = "128"
+#   container_definitions = jsonencode([
+#     {
+#       name      = "blog_app_container"
+#       image     = local.blog_image_uri #using public repo
+#       cpu       = 128
+#       memory    = 128
+#       essential = true
+#       portMappings = [
+#         {
+#           containerPort = 3001
+#           hostPort      = 0 #host port 0 means dynamic port mapping since using bridge mode
+#           protocol      = "tcp"
+#         }
+#       ]
+#       secrets = [
+#         {
+#           name      = "DB_USER"
+#           valueFrom = "/blog-app/DB_USER"
+#         },
+#         {
+#           name      = "DB_PASS"
+#           valueFrom = "/blog-app/DB_PASS"
+#         },
+#         {
+#           name      = "DB_HOST"
+#           valueFrom = "/blog-app/DB_HOST"
+#         },
+#         {
+#           name      = "S3_BUCKET_NAME"
+#           valueFrom = "/blog-app/S3_BUCKET_NAME"
+#           }, {
+#           name      = "DB_NAME"
+#           valueFrom = "/blog-app/DB_NAME"
+#         },
+#         {
+#           name      = "AWS_REGION"
+#           valueFrom = "/blog-app/AWS_REGION"
+#         },
+#         {
+#           name      = "DB_PORT"
+#           valueFrom = "/blog-app/DB_PORT"
+#         },
+#         {
+#           name      = "S3_BUCKET_NAME_TEMPLATE"
+#           valueFrom = "/blog-app/S3_BUCKET_NAME_TEMPLATE"
+#         },
+#         {
+#           name      = "S3_BUCKET_REGION"
+#           valueFrom = "/blog-app/S3_BUCKET_REGION"
+#         },
+#         {
+#           name      = "AWS_ACCOUNT"
+#           valueFrom = "/blog-app/AWS_ACCOUNT"
+#         }
+#       ]
+#     }
+#   ])
+# }
+
+
+module "my_task_definition" {
+  source             = "./modules/task_definitionmod"
+  memory             = "128"
+  cpu                = "128"
+  network_mode       = "bridge"
+  execution_role_arn = module.iam_ecstaskexectionrole.ecstaskexecution_role_arn
+  task_role_arn      = module.iam_task_role.taskrole_arn
+  blog_image_uri     = local.blog_image_uri
+  secrets = [
     {
-      name      = "blog_app_container"
-      image     = local.blog_image_uri #using public repo
-      cpu       = 128
-      memory    = 128
-      essential = true
-      portMappings = [
-        {
-          containerPort = 3001
-          hostPort      = 0 #host port 0 means dynamic port mapping since using bridge mode
-          protocol      = "tcp"
-        }
-      ]
-      secrets = [
-        {
-          name      = "DB_USER"
-          valueFrom = "/blog-app/DB_USER"
-        },
-        {
-          name      = "DB_PASS"
-          valueFrom = "/blog-app/DB_PASS"
-        },
-        {
-          name      = "DB_HOST"
-          valueFrom = "/blog-app/DB_HOST"
-        },
-        {
-          name      = "S3_BUCKET_NAME"
-          valueFrom = "/blog-app/S3_BUCKET_NAME"
-          }, {
-          name      = "DB_NAME"
-          valueFrom = "/blog-app/DB_NAME"
-        },
-        {
-          name      = "AWS_REGION"
-          valueFrom = "/blog-app/AWS_REGION"
-        },
-        {
-          name      = "DB_PORT"
-          valueFrom = "/blog-app/DB_PORT"
-        },
-        {
-          name      = "S3_BUCKET_NAME_TEMPLATE"
-          valueFrom = "/blog-app/S3_BUCKET_NAME_TEMPLATE"
-        },
-        {
-          name      = "S3_BUCKET_REGION"
-          valueFrom = "/blog-app/S3_BUCKET_REGION"
-        },
-        {
-          name      = "AWS_ACCOUNT"
-          valueFrom = "/blog-app/AWS_ACCOUNT"
-        }
-      ]
+      name      = "DB_USER"
+      valueFrom = "/blog-app/DB_USER"
+    },
+    {
+      name      = "DB_PASS"
+      valueFrom = "/blog-app/DB_PASS"
+    },
+    {
+      name      = "DB_HOST"
+      valueFrom = "/blog-app/DB_HOST"
+    },
+    {
+      name      = "S3_BUCKET_NAME"
+      valueFrom = "/blog-app/S3_BUCKET_NAME"
+      }, {
+      name      = "DB_NAME"
+      valueFrom = "/blog-app/DB_NAME"
+    },
+    {
+      name      = "AWS_REGION"
+      valueFrom = "/blog-app/AWS_REGION"
+    },
+    {
+      name      = "DB_PORT"
+      valueFrom = "/blog-app/DB_PORT"
+    },
+    {
+      name      = "S3_BUCKET_NAME_TEMPLATE"
+      valueFrom = "/blog-app/S3_BUCKET_NAME_TEMPLATE"
+    },
+    {
+      name      = "S3_BUCKET_REGION"
+      valueFrom = "/blog-app/S3_BUCKET_REGION"
+    },
+    {
+      name      = "AWS_ACCOUNT"
+      valueFrom = "/blog-app/AWS_ACCOUNT"
     }
-  ])
+  ]
+
 }
-
-
 
 
 
 
 ###################aws_ecs_cluster_capacity_providers###
 resource "aws_ecs_cluster_capacity_providers" "blog_ecs_cluster_capacity" {
-  cluster_name = module.my_ecs.my_ecs_name
+  cluster_name = module.my_ecs_cluster.my_ecs_name
 
   capacity_providers = [
     aws_ecs_capacity_provider.my_capacity_provider.name,
@@ -570,37 +593,33 @@ resource "aws_ecs_cluster_capacity_providers" "blog_ecs_cluster_capacity" {
 
 
 
-resource "aws_ecs_service" "blog_app_service" {
+module "blog_app_service" {
+  source                             = "./modules/ecsservice_module"
   name                               = "app-service"
-  cluster                            = module.my_ecs.my_ecs_name
-  force_new_deployment               = true
-  force_delete                       = true
-  task_definition                    = aws_ecs_task_definition.blog_app_task.arn
-  desired_count                      = var.replica_count
+  clustername                        = module.my_ecs_cluster.my_ecs_name
+  task_definition_arn                = module.my_task_definition.mytaskdef_arn
+  desired_count                      = var.replica_count ##default is 2
   scheduling_strategy                = "REPLICA"
   deployment_minimum_healthy_percent = 0
   health_check_grace_period_seconds  = 60
-  capacity_provider_strategy {
-    capacity_provider = aws_ecs_capacity_provider.my_capacity_provider.name
-    weight            = 100
-  }
-  ordered_placement_strategy {
+  capacity_provider_name             = aws_ecs_capacity_provider.my_capacity_provider.name
+
+  ordered_placement_strategy = [{
     type  = "spread"
     field = "instanceId"
 
+  }]
 
-  }
 
-  load_balancer {
-    target_group_arn = aws_lb_target_group.blogapp_tg.arn
-    container_name   = "blog_app_container"
-    container_port   = 3001
-  }
+  target_group_arn = aws_lb_target_group.blogapp_tg.arn
+  container_name   = "blog_app_container"
+  container_port   = 3001
+
   depends_on = [aws_lb_listener.app_listener,
     aws_lb_target_group.blogapp_tg,
     aws_lb.frontend_lb,
     aws_ecs_cluster_capacity_providers.blog_ecs_cluster_capacity,
-    aws_autoscaling_group.ecs-autoscaling-group,
+    module.ecs_autoscaling-group,
     module.iam_instance_profile.aws_iam_role_policy_attachment,
   module.iam_ecstaskexectionrole]
 
@@ -669,14 +688,7 @@ resource "aws_ecs_service" "blog_app_service" {
 
 
 ###########################################
-locals {
-  ecs_cluster_name = module.my_ecs.my_ecs_name
-}
 
-locals {
-
-  cluster_id = module.my_ecs.my_ecs_id
-}
 
 
 
@@ -830,95 +842,101 @@ module "db" {
 
 }
 
+////////////////   TO MODULE CHANGING////////////////
+
+# # # # # #create ################################     S3bucket for storing blog images  #######
+# resource "aws_s3_bucket" "blog_app_bucket" {
+#   bucket = var.s3_bucket_name
+#   tags = {
+#     Name        = "Blog App Bucket"
+#     Environment = terraform.workspace
+#   }
+# }
+
+# # #bucket encryption using KMS
+# resource "aws_s3_bucket_server_side_encryption_configuration" "blogapp_encryption" {
+#   bucket = aws_s3_bucket.blog_app_bucket.id
+
+#   rule {
+#     bucket_key_enabled = true
+#   }
+# }
 
 
-# # # # #create ################################     S3bucket for storing blog images  #######
-resource "aws_s3_bucket" "blog_app_bucket" {
-  bucket = var.s3_bucket_name
-  tags = {
-    Name        = "Blog App Bucket"
-    Environment = terraform.workspace
-  }
-}
-
-# #bucket encryption using KMS
-resource "aws_s3_bucket_server_side_encryption_configuration" "blogapp_encryption" {
-  bucket = aws_s3_bucket.blog_app_bucket.id
-
-  rule {
-    bucket_key_enabled = true
-  }
-}
-
-
-# # ###test s3
-resource "aws_s3_bucket_policy" "blog_app_bucket_policy" {
-  bucket     = aws_s3_bucket.blog_app_bucket.id
-  depends_on = [aws_s3_bucket_public_access_block.blogapp_public_access]
-  policy = jsonencode({
-    "Version" : "2012-10-17",
-    "Statement" : [
-      {
-        "Sid" : "AllowIAMUserAccess",
-        "Effect" : "Allow",
-        "Principal" : { "AWS" : "${var.principle_arn}" },
-        "Action" : ["s3:GetObject", "s3:PutObject"],
-        "Resource" : "arn:aws:s3:::${var.s3_bucket_name}/*"
-      },
-      {
-        "Sid" : "PublicReadUploads",
-        "Effect" : "Allow",
-        "Principal" : "*",
-        "Action" : ["s3:GetObject"],
-        "Resource" : "arn:aws:s3:::${var.s3_bucket_name}/uploads/*"
-      }
-    ]
-  })
-}
+# # # ###test s3
+# resource "aws_s3_bucket_policy" "blog_app_bucket_policy" {
+#   bucket     = aws_s3_bucket.blog_app_bucket.id
+#   depends_on = [aws_s3_bucket_public_access_block.blogapp_public_access]
+#   policy = jsonencode({
+#     "Version" : "2012-10-17",
+#     "Statement" : [
+#       {
+#         "Sid" : "AllowIAMUserAccess",
+#         "Effect" : "Allow",
+#         "Principal" : { "AWS" : "${var.principle_arn}" },
+#         "Action" : ["s3:GetObject", "s3:PutObject"],
+#         "Resource" : "arn:aws:s3:::${var.s3_bucket_name}/*"
+#       },
+#       {
+#         "Sid" : "PublicReadUploads",
+#         "Effect" : "Allow",
+#         "Principal" : "*",
+#         "Action" : ["s3:GetObject"],
+#         "Resource" : "arn:aws:s3:::${var.s3_bucket_name}/uploads/*"
+#       }
+#     ]
+#   })
+# }
 
 
 
 
-# # # CORS configuration to allow cross-origin requests
+# # # # CORS configuration to allow cross-origin requests
 
-resource "aws_s3_bucket_cors_configuration" "blogapp_cors" {
-  bucket = aws_s3_bucket.blog_app_bucket.id
+# resource "aws_s3_bucket_cors_configuration" "blogapp_cors" {
+#   bucket = aws_s3_bucket.blog_app_bucket.id
 
-  cors_rule {
-    allowed_headers = ["*"]
-    allowed_methods = ["PUT", "POST"]
-    allowed_origins = ["*"]
-    expose_headers  = ["ETag"]
-    max_age_seconds = 3000
-  }
+#   cors_rule {
+#     allowed_headers = ["*"]
+#     allowed_methods = ["PUT", "POST"]
+#     allowed_origins = ["*"]
+#     expose_headers  = ["ETag"]
+#     max_age_seconds = 3000
+#   }
 
-  cors_rule {
-    allowed_methods = ["GET"]
-    allowed_origins = ["*"]
-  }
-}
+#   cors_rule {
+#     allowed_methods = ["GET"]
+#     allowed_origins = ["*"]
+#   }
+# }
 
-resource "aws_s3_bucket_ownership_controls" "blogapp_ownership" {
-  bucket = aws_s3_bucket.blog_app_bucket.id
+# resource "aws_s3_bucket_ownership_controls" "blogapp_ownership" {
+#   bucket = aws_s3_bucket.blog_app_bucket.id
 
-  rule {
-    object_ownership = "BucketOwnerPreferred"
-  }
-}
+#   rule {
+#     object_ownership = "BucketOwnerPreferred"
+#   }
+# }
 
-resource "aws_s3_bucket_public_access_block" "blogapp_public_access" {
-  bucket = aws_s3_bucket.blog_app_bucket.id
+# resource "aws_s3_bucket_public_access_block" "blogapp_public_access" {
+#   bucket = aws_s3_bucket.blog_app_bucket.id
 
-  block_public_acls       = false
-  block_public_policy     = false
-  ignore_public_acls      = false
-  restrict_public_buckets = false
-}
+#   block_public_acls       = false
+#   block_public_policy     = false
+#   ignore_public_acls      = false
+#   restrict_public_buckets = false
+# }
 
 
 # # ################################################################################################## Lambda function to send welcome email using SES and S3
 # # # create lambda function and ses & s3 fetch
 # # # :my-wemail-template bucket is assuemd to be present and has the email template files stored in it. 
+
+
+
+//////////////////// 
+
+
 
 # # IAM role for Lambda execution
 data "aws_iam_policy_document" "assume_role" {
@@ -1020,10 +1038,6 @@ resource "aws_lb_listener_certificate" "myssl_cert" {
 }
 # # #########################cloudflare provider module##########################
 
-variable "cloudflare_zone_id" {
-  type        = string
-  description = "Cloudflare Zone ID for just4study.click"
-}
 
 
 module "cloudflare" {
@@ -1045,18 +1059,32 @@ module "iam_ecstaskexectionrole" {
 
 }
 
+###IAM instance Profile for ECS container instances###
+
 module "iam_instance_profile" {
   source = "./modules/iam_instance_ecs_profile"
 
 }
 
-
-module "my_ecs" {
-  source = "./modules/ecs_clustermod"
-  name   = var.myecs_clustername
-
+##Ecs cluster creation ###
+module "my_ecs_cluster" {
+  source            = "./modules/myecs_clustermod"
+  myecs_clustername = var.myecs_clustername
 
 }
 
+locals {
+  ecs_cluster_name = module.my_ecs_cluster.my_ecs_name
+}
 
+locals {
 
+  cluster_id = module.my_ecs_cluster.my_ecs_id
+}
+
+##image upload bucket module###
+module "blog_imgageuploadbuckets3" {
+  source         = "./modules/s3_blogimages_bucket"
+  s3_bucket_name = "myaws3-buk"
+
+}
